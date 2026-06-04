@@ -34,6 +34,8 @@ Token efficiency is about getting the answer you need with the smallest useful p
 
 Instant models in Microsoft Foundry let you call supported models by name without first creating a deployment. They are useful for prototyping, comparing models, trying new releases quickly, and building early application flows before you decide whether you need a dedicated deployment for reserved throughput, custom controls, or production isolation.
 
+Instant models are still quota-governed. During preview, they draw from a per-model global quota pool assigned to your subscription, and requests can be throttled if available capacity is exceeded. If you see rate-limit responses such as HTTP 429, add retry logic with backoff and consider requesting a quota increase or moving production traffic to a deployment with reserved capacity. See [Instant models in Microsoft Foundry](https://learn.microsoft.com/en-us/azure/foundry/concepts/instant-models) and [Microsoft Foundry Models quotas and limits](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/quotas-limits) for the current guidance.
+
 This Java sample calls an instant model from a Foundry project endpoint, prints token usage, and estimates cost per call with live pricing from the Azure Retail Prices API.
 
 The sample follows the Microsoft Foundry Java quickstart pattern with `com.azure:azure-ai-agents:2.0.0` and uses Microsoft Entra authentication through `DefaultAzureCredential`. No API key or project-specific secret is stored in this repository.
