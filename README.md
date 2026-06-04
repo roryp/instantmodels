@@ -1,10 +1,10 @@
-# Instant Models Java Sample
+# Token Efficiency Samples
 
 Live app: [http://aka.ms/costs](http://aka.ms/costs)
 
 ## Contents
 
-- [Token Efficiency](#token-efficiency)
+- [Introduction](#introduction)
 - [Example overview](#example-overview)
 - [What It Does](#what-it-does)
 - [Screenshots](#screenshots)
@@ -20,7 +20,7 @@ Live app: [http://aka.ms/costs](http://aka.ms/costs)
     - [`gpt-chat-latest` vs `gpt-5.5` Pricing](#gpt-chat-latest-vs-gpt-55-pricing)
 - [Project Layout](#project-layout)
 
-## Token Efficiency
+## Introduction
 
 Token efficiency is about getting the answer you need with the smallest useful prompt, model, and tool surface. This sample makes that visible by printing input, output, cached-input, and cost for every call.
 
