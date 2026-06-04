@@ -49,6 +49,21 @@ module foundry 'foundry.bicep' = {
   }
 }
 
+module containerApp 'container-app.bicep' = {
+  name: 'container-app'
+  scope: rg
+  params: {
+    location: location
+    tags: tags
+    environmentName: environmentName
+    aiFoundryAccountName: foundry.outputs.accountName
+    aiFoundryProjectName: foundry.outputs.projectName
+    foundryProjectEndpoint: foundry.outputs.projectEndpoint
+    modelName: 'gpt-chat-latest'
+    pricingRegion: location
+  }
+}
+
 output AZURE_RESOURCE_GROUP string = rg.name
 output AZURE_LOCATION string = location
 output AZURE_AI_ACCOUNT_NAME string = foundry.outputs.accountName
@@ -59,3 +74,9 @@ output AZURE_AI_FOUNDRY_PROJECT_ID string = foundry.outputs.projectId
 output AZURE_AI_PROJECT_ENDPOINT string = foundry.outputs.projectEndpoint
 output FOUNDRY_PROJECT_ENDPOINT string = foundry.outputs.projectEndpoint
 output AZURE_OPENAI_ENDPOINT string = foundry.outputs.openAiEndpoint
+output AZURE_CONTAINER_REGISTRY_NAME string = containerApp.outputs.containerRegistryName
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerApp.outputs.containerRegistryEndpoint
+output AZURE_CONTAINER_APP_NAME string = containerApp.outputs.containerAppName
+output AZURE_CONTAINER_APP_URL string = containerApp.outputs.containerAppUrl
+output AZURE_CONTAINER_APP_IDENTITY_ID string = containerApp.outputs.managedIdentityId
+output AZURE_CONTAINER_APP_IDENTITY_CLIENT_ID string = containerApp.outputs.managedIdentityClientId

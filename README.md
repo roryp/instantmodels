@@ -54,6 +54,9 @@ This repo includes an Azure Developer CLI (`azd`) and Bicep setup that creates t
 - Azure AI Services account with Foundry project management enabled
 - Microsoft Foundry project
 - Azure AI User role assignment for the signed-in deployer on the Foundry project
+- Azure Container Registry
+- Azure Container Apps environment and Container App
+- Managed identity with ACR pull and Foundry project access
 
 The default location is `westus3`, which is the preview region used for instant model testing.
 
@@ -61,10 +64,18 @@ The default location is `westus3`, which is the preview region used for instant 
 az login
 azd auth login
 azd env new instantmodels --location westus3
-azd provision
+azd up
 ```
 
-After provisioning, copy the emitted `FOUNDRY_PROJECT_ENDPOINT` value into your local `.env` file. The `.env` file is ignored by git.
+`azd up` provisions the Azure resources, builds the Spring Boot Docker image locally, pushes it to Azure Container Registry, deploys it to Azure Container Apps, and prints the live endpoint. Local Docker must be running because this template intentionally disables ACR remote build.
+
+For later code-only updates, run:
+
+```powershell
+azd deploy web
+```
+
+The service is mapped in [azure.yaml](azure.yaml) as a standard `containerapp` service with a local Docker build. The Bicep tags the Container App with `azd-service-name: web` so azd can deploy to it.
 
 To remove the Azure resources later:
 

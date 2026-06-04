@@ -4,3 +4,13 @@ name: instantmodels
 infra:
   provider: bicep
   path: infra
+
+services:
+  web:
+    project: .
+    language: docker
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+      context: .
+      remoteBuild: false

@@ -1,6 +1,9 @@
 target/
 infra/main.json
 .azure/
+.classpath
+.factorypath
+.project
 .idea/
 .vscode/
 .env

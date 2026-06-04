@@ -1,0 +1,10 @@
+.azure/
+.git/
+.idea/
+.vscode/
+target/
+.env
+.env.*
+*.log
+*.class
+*.iml
