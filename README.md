@@ -95,6 +95,14 @@ mvn test
 mvn compile exec:java
 ```
 
+To run the Spring Boot web dashboard locally:
+
+```powershell
+mvn spring-boot:run
+```
+
+Open `http://localhost:8080` and use the buttons to run the instant model demo or the prompt cache demo.
+
 Use `mvn compile exec:java` after `mvn clean` or from a fresh clone. `mvn exec:java` by itself only works after classes already exist under `target/classes`.
 
 Optional one-off overrides:
@@ -181,12 +189,16 @@ The Azure Retail Prices API is queried at runtime, so the estimate reflects the 
 `-- src
     |-- main
     |   |-- java/com/example/instantmodels
+    |   |   |-- DemoController.java
+    |   |   |-- DemoRunService.java
     |   |   |-- InstantModelsApp.java
     |   |   |-- InstantModelsConfig.java
+    |   |   |-- InstantModelsWebApplication.java
     |   |   |-- ModelPricing.java
     |   |   |-- PromptCacheDemoApp.java
     |   |   `-- RetailPricingClient.java
-    |   `-- resources/simplelogger.properties
+    |   |-- resources/application.properties
+    |   `-- resources/static
     `-- test/java/com/example/instantmodels/InstantModelsConfigTest.java
 ```
 

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Instant Models Lab</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <main class="shell">
+        <section class="intro" aria-labelledby="page-title">
+            <div>
+                <p class="eyebrow">Microsoft Foundry Java sample</p>
+                <h1 id="page-title">Instant Models Lab</h1>
+                <p class="lede">Run an instant model call, then compare a warm-up prompt with a repeated prompt that reuses cached input tokens.</p>
+            </div>
+            <dl class="config-strip" id="configStrip" aria-label="Runtime configuration">
+                <div><dt>Model</dt><dd id="modelValue">Loading</dd></div>
+                <div><dt>Meter</dt><dd id="meterValue">Loading</dd></div>
+                <div><dt>Region</dt><dd id="regionValue">Loading</dd></div>
+            </dl>
+        </section>
+
+        <section class="workspace" aria-label="Demo controls and output">
+            <article class="panel instant-panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Fast path</p>
+                        <h2>Instant Demo</h2>
+                    </div>
+                    <span class="chip">1 call</span>
+                </div>
+                <label for="promptBox">Prompt</label>
+                <textarea id="promptBox" rows="5">In one sentence, why are instant models useful for prototyping?</textarea>
+                <button id="instantButton" class="action action-primary" type="button">Run instant model</button>
+                <div id="instantResult" class="result empty">Ready for a quick call.</div>
+            </article>
+
+            <article class="panel cache-panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Reusable prefix</p>
+                        <h2>Prompt Cache Demo</h2>
+                    </div>
+                    <span class="chip">2 calls</span>
+                </div>
+                <p class="panel-copy">Uses a long stable reference prompt and a fresh cache key. The warm-up call primes the cache; the repeated call should show cached input tokens and lower estimated cost.</p>
+                <button id="cacheButton" class="action action-secondary" type="button">Run cache demo</button>
+                <div id="cacheResult" class="result empty">Ready to show cache reuse.</div>
+            </article>
+        </section>
+    </main>
+    <script src="/app.js"></script>
+</body>
+</html>
