@@ -12,6 +12,7 @@
     <properties>
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <exec.mainClass>com.example.instantmodels.InstantModelsApp</exec.mainClass>
         <junit.jupiter.version>5.11.4</junit.jupiter.version>
     </properties>
 
@@ -62,7 +63,7 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.5.0</version>
                 <configuration>
-                    <mainClass>com.example.instantmodels.InstantModelsApp</mainClass>
+                    <mainClass>${exec.mainClass}</mainClass>
                     <cleanupDaemonThreads>false</cleanupDaemonThreads>
                 </configuration>
             </plugin>

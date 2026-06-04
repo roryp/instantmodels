@@ -11,7 +11,7 @@ The sample follows the Microsoft Foundry Java quickstart pattern with `com.azure
 - Calls a Microsoft Foundry project endpoint with the Responses API.
 - Uses an instant model by name, so no model deployment is required.
 - Loads local settings from `.env`, while keeping `.env` out of git.
-- Prints the model response plus input, output, and total token usage.
+- Prints the model response plus input, output, total, and cached-input token usage.
 - Looks up current prices at runtime from `https://prices.azure.com/api/retail/prices`.
 - Estimates per-call cost from the returned token usage and live retail pricing meters.
 
@@ -105,6 +105,35 @@ $env:FOUNDRY_PROMPT = "Explain instant models in one sentence."
 mvn compile exec:java
 ```
 
+## Prompt Cache Demo
+
+The default sample is intentionally small, so it usually has no cached input tokens. For demos, use the dedicated prompt-cache example. It sends the same long prompt twice with a stable `promptCacheKey`, then compares the warm-up call with the repeated call. This demo intentionally uses a much longer prompt than the default sample so the cache behavior is visible.
+
+```powershell
+mvn compile exec:java '-Dexec.mainClass=com.example.instantmodels.PromptCacheDemoApp'
+```
+
+The repeated call should show cached input tokens when the service reuses the long prompt prefix:
+
+```text
+Prompt cache demo
+Model: gpt-chat-latest
+Cache key: im-cache-<run-id>
+Prompt characters: 60935
+
+Warm-up call
+Usage: input=10045 tokens, output=33 tokens, total=10078 tokens
+Cache details: standard-input=10045 tokens, cached-input=0 tokens, cache-hit-rate=0.00%
+Estimated cost: USD 0.05121500
+Estimated cache savings versus uncached input: USD 0.00000000
+
+Repeated call
+Usage: input=10045 tokens, output=34 tokens, total=10079 tokens
+Cache details: standard-input=317 tokens, cached-input=9728 tokens, cache-hit-rate=96.84%
+Estimated cost: USD 0.00746900
+Estimated cache savings versus uncached input: USD 0.04377600
+```
+
 ## Example Output
 
 The exact response and token counts vary by run, but the output looks like this:
@@ -113,8 +142,10 @@ The exact response and token counts vary by run, but the output looks like this:
 Model: gpt-chat-latest
 Response: Instant models in Microsoft Foundry are preconfigured AI models designed for immediate use with low-latency inference.
 Usage: input=19 tokens, output=106 tokens, total=125 tokens
+Cache details: standard-input=19 tokens, cached-input=0 tokens, cache-hit-rate=0.00%
 Pricing: input=USD 5 per 1M tokens, cached-input=USD 0.5 per 1M tokens, output=USD 30 per 1M tokens (model=gpt-chat-latest, meter-prefix=5.5 ShortCo, region=westus3, scope=Gl, retrieved=2026-06-04T07:58:17Z)
 Pricing meters: input='5.5 ShortCo inp Gl 1M Tokens', cached-input='5.5 ShortCo cd inp Gl 1M Tokens', output='5.5 ShortCo opt Gl 1M Tokens'
+Cost breakdown: standard-input=USD 0.00009500, cached-input=USD 0.00000000, output=USD 0.00318000
 Estimated cost: USD 0.00327500
 ```
 
@@ -153,6 +184,7 @@ The Azure Retail Prices API is queried at runtime, so the estimate reflects the 
     |   |   |-- InstantModelsApp.java
     |   |   |-- InstantModelsConfig.java
     |   |   |-- ModelPricing.java
+    |   |   |-- PromptCacheDemoApp.java
     |   |   `-- RetailPricingClient.java
     |   `-- resources/simplelogger.properties
     `-- test/java/com/example/instantmodels/InstantModelsConfigTest.java
