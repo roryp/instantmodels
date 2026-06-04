@@ -38,6 +38,12 @@ class DemoController {
         return demoRunService.runPromptCacheDemo();
     }
 
+    @PostMapping("/compact-demo")
+    DemoRunService.CompactDemoResult compactDemo(@RequestBody(required = false) CompactRequest request) {
+        String prompt = request == null ? null : request.prompt();
+        return demoRunService.runCompactDemo(prompt);
+    }
+
     @ExceptionHandler(RuntimeException.class)
     ResponseEntity<ApiError> handleRuntimeException(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
@@ -45,6 +51,9 @@ class DemoController {
     }
 
     record InstantRequest(String prompt) {
+    }
+
+    record CompactRequest(String prompt) {
     }
 
     record ConfigResponse(String model, String pricingRegion, String pricingScope, String pricingMeterPrefix) {

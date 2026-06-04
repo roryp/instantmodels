@@ -1,10 +1,14 @@
 const instantButton = document.querySelector('#instantButton');
 const cacheButton = document.querySelector('#cacheButton');
+const compactButton = document.querySelector('#compactButton');
 const promptBox = document.querySelector('#promptBox');
+const compactPromptBox = document.querySelector('#compactPromptBox');
 const instantResult = document.querySelector('#instantResult');
 const cacheResult = document.querySelector('#cacheResult');
+const compactResult = document.querySelector('#compactResult');
 
 const formatPercent = (value) => `${Number(value).toFixed(2)}%`;
+const formatInteger = (value) => new Intl.NumberFormat().format(Number(value ?? 0));
 const escapeHtml = (value) => String(value ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -20,7 +24,7 @@ async function postJson(url, body) {
     });
     const json = await response.json();
     if (!response.ok) {
-        throw new Error(json.error || `Request failed with ${response.status}`);
+        throw new Error(json.message || json.error || `Request failed with ${response.status}`);
     }
     return json;
 }
@@ -73,6 +77,29 @@ function renderCacheRun(run, pricing) {
     `;
 }
 
+function renderCompaction(data) {
+    const compaction = data.compaction;
+    const cost = data.cost;
+    const reductionWidth = Math.max(0, Math.min(100, compaction.tokenReductionRate));
+
+    compactResult.className = 'result';
+    compactResult.innerHTML = `
+        <p class="answer">${escapeHtml(data.compactedPrompt)}</p>
+        <div class="metrics">
+            <div class="metric"><strong>${formatInteger(compaction.sourceTokens)}</strong><span>Source tokens</span></div>
+            <div class="metric"><strong>${formatInteger(compaction.compactedTokens)}</strong><span>Compacted tokens</span></div>
+            <div class="metric"><strong>${formatInteger(compaction.tokensSaved)}</strong><span>Tokens saved</span></div>
+        </div>
+        <div class="cache-bar" aria-label="Token reduction ${formatPercent(compaction.tokenReductionRate)}">
+            <div class="compact-fill" style="width: ${reductionWidth}%"></div>
+        </div>
+        <p class="fine-print">Reduction: ${formatPercent(compaction.tokenReductionRate)} · Source characters: ${formatInteger(data.sourceCharacters)} · Compacted characters: ${formatInteger(data.compactedCharacters)}</p>
+        <p class="fine-print">Compaction call usage: input ${formatInteger(data.usage.inputTokens)} tokens · output ${formatInteger(data.usage.outputTokens)} tokens · total ${formatInteger(data.usage.totalTokens)} tokens</p>
+        <p class="fine-print">Estimated compaction cost: ${cost.currencyCode} ${cost.total} (input ${cost.currencyCode} ${cost.standardInput}, output ${cost.currencyCode} ${cost.output})</p>
+        <p class="fine-print">Source tokens are request-level input tokens reported by the service, including the submitted notes and compaction instructions.</p>
+    `;
+}
+
 function showError(target, error) {
     target.className = 'result error';
     target.textContent = error.message;
@@ -109,6 +136,19 @@ cacheButton.addEventListener('click', async () => {
         showError(cacheResult, error);
     } finally {
         cacheButton.disabled = false;
+    }
+});
+
+compactButton.addEventListener('click', async () => {
+    compactButton.disabled = true;
+    compactResult.className = 'result empty';
+    compactResult.textContent = 'Compacting working notes...';
+    try {
+        renderCompaction(await postJson('/api/compact-demo', { prompt: compactPromptBox.value }));
+    } catch (error) {
+        showError(compactResult, error);
+    } finally {
+        compactButton.disabled = false;
     }
 });
 

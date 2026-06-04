@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Instant Models Lab</title>
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/styles.css?v=20260604-compact-demo">
 </head>
 <body>
     <main class="shell">
@@ -12,7 +12,7 @@
             <div>
                 <p class="eyebrow">Microsoft Foundry Java sample</p>
                 <h1 id="page-title">Instant Models Lab</h1>
-                <p class="lede">Run an instant model call, then compare a warm-up prompt with a repeated prompt that reuses cached input tokens.</p>
+                <p class="lede">Run an instant model call, compare prompt cache reuse, then compact long working notes into a smaller reusable prompt.</p>
             </div>
             <dl class="config-strip" id="configStrip" aria-label="Runtime configuration">
                 <div><dt>Model</dt><dd id="modelValue">Loading</dd></div>
@@ -48,8 +48,27 @@
                 <button id="cacheButton" class="action action-secondary" type="button">Run cache demo</button>
                 <div id="cacheResult" class="result empty">Ready to show cache reuse.</div>
             </article>
+
+            <article class="panel compact-panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Conversation hygiene</p>
+                        <h2>Compaction Demo</h2>
+                    </div>
+                    <span class="chip">1 call</span>
+                </div>
+                <label for="compactPromptBox">Working notes</label>
+                <textarea id="compactPromptBox" rows="10">Goal: ship a small Java dashboard change that explains instant model throughput limits.
+Context gathered: Microsoft Foundry instant models are preview-scoped to West US 3 and can be called by model name without creating a deployment. They draw from a per-model global quota pool assigned to the subscription. The app should keep token usage, pricing, and cache behavior visible because this repository is a cost-transparency sample.
+Online docs checked: instant models are for getting started, prototyping, and trying new models. Deployments remain the right choice for reserved throughput, custom guardrails, data residency requirements, endpoint-specific configuration, fine-grained quota partitioning, fine-tuned models, or predictable production capacity.
+Sanitized validation finding: one development subscription reported Tier 5 Global Standard quota for gpt-chat-latest of 50,000 requests per minute and 5,000,000 tokens per minute, with no Global Standard deployment quota reserved at the time of the check. Do not include subscription IDs, tenant IDs, user names, or generated Azure environment files in docs.
+Implementation notes: update README in the Example overview and Token Efficiency sections, keep dashboard controls compact, run mvn test after Java changes, and use azd up for full deployment validation rather than manual container app commands.
+Open question: after the docs update, add a dashboard example that compacts long working notes into a shorter durable summary and shows the token savings for future prompts.</textarea>
+                <button id="compactButton" class="action action-tertiary" type="button">Compact prompt</button>
+                <div id="compactResult" class="result empty">Ready to compact working notes.</div>
+            </article>
         </section>
     </main>
-    <script src="/app.js"></script>
+    <script src="/app.js?v=20260604-compact-demo"></script>
 </body>
 </html>

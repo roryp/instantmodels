@@ -18,6 +18,21 @@ import org.springframework.stereotype.Service;
 @Service
 class DemoRunService {
     private static final String CACHE_KEY_PREFIX = "im-web-cache";
+    private static final String DEFAULT_COMPACT_PROMPT = String.join("\n",
+            "Goal: ship a small Java dashboard change that explains instant model throughput limits.",
+            "Context gathered: Microsoft Foundry instant models are preview-scoped to West US 3 and can be called by model name without creating a deployment. They draw from a per-model global quota pool assigned to the subscription. The app should keep token usage, pricing, and cache behavior visible because this repository is a cost-transparency sample.",
+            "Online docs checked: instant models are for getting started, prototyping, and trying new models. Deployments remain the right choice for reserved throughput, custom guardrails, data residency requirements, endpoint-specific configuration, fine-grained quota partitioning, fine-tuned models, or predictable production capacity.",
+            "Sanitized validation finding: one development subscription reported Tier 5 Global Standard quota for gpt-chat-latest of 50,000 requests per minute and 5,000,000 tokens per minute, with no Global Standard deployment quota reserved at the time of the check. Do not include subscription IDs, tenant IDs, user names, or generated Azure environment files in docs.",
+            "Implementation notes: update README in the Example overview and Token Efficiency sections, keep dashboard controls compact, run mvn test after Java changes, and use azd up for full deployment validation rather than manual container app commands.",
+            "Open question: after the docs update, add a dashboard example that compacts long working notes into a shorter durable summary and shows the token savings for future prompts.");
+    private static final String COMPACTION_INSTRUCTIONS = String.join(" ",
+            "Compact the submitted working notes into a concise durable context summary for a future assistant turn.",
+            "Use at most six compact sentences, no markdown bullets, and no nested lists.",
+            "Preserve only next-turn essentials: goal, key facts, docs or files to update, validation and deploy commands, blockers, and privacy constraints.",
+            "Remove repetition, resolved dead ends, greetings, transient logs, and exact values that are not needed for the next step.",
+            "Summarize quota findings as sanitized quota evidence instead of repeating every number.",
+            "Omit optional follow-ups unless they are required for the next action.",
+            "Return only the compacted summary.");
 
     InstantDemoResult runInstantDemo(String promptOverride) {
         String prompt = InstantModelsConfig.valueOrDefault(promptOverride, InstantModelsConfig.prompt());
@@ -57,6 +72,43 @@ class DemoRunService {
                         summarize("Repeated call", repeated, pricing)));
     }
 
+    CompactDemoResult runCompactDemo(String promptOverride) {
+        String prompt = InstantModelsConfig.valueOrDefault(promptOverride, DEFAULT_COMPACT_PROMPT);
+        Response response = responsesClient().getResponseService().create(new ResponseCreateParams.Builder()
+                .input(prompt)
+                .instructions(COMPACTION_INSTRUCTIONS)
+                .model(InstantModelsConfig.model())
+                .maxOutputTokens(360)
+                .build());
+
+        ResponseUsage usage = usage(response);
+        ModelPricing pricing = pricing();
+        PricingEstimate estimate = pricing.estimateCost(usage);
+        String compactedPrompt = outputText(response);
+        long compactedTokens = usage.outputTokens();
+
+        return new CompactDemoResult(
+                InstantModelsConfig.model(),
+                prompt,
+                compactedPrompt,
+                prompt.length(),
+                compactedPrompt.length(),
+                new UsageSummary(usage.inputTokens(), usage.outputTokens(), usage.totalTokens()),
+                new CompactionSummary(
+                        usage.inputTokens(),
+                        compactedTokens,
+                        tokensSaved(usage.inputTokens(), compactedTokens),
+                        tokenReductionRate(usage.inputTokens(), compactedTokens)),
+                new CostSummary(
+                        estimate.currencyCode(),
+                        formatCost(estimate.standardInputCost()),
+                        formatCost(estimate.cachedInputCost()),
+                        formatCost(estimate.outputCost()),
+                        estimate.totalCost().toPlainString(),
+                        formatCost(BigDecimal.ZERO)),
+                pricingSummary(pricing));
+    }
+
     private Response createCachedResponse(String prompt, String cacheKey) {
         ResponseCreateParams responseRequest = new ResponseCreateParams.Builder()
                 .input(prompt)
@@ -85,8 +137,7 @@ class DemoRunService {
     }
 
     private CallSummary summarize(String label, Response response, ModelPricing pricing) {
-        ResponseUsage usage = response.usage()
-                .orElseThrow(() -> new IllegalStateException("Usage was not returned by the service."));
+        ResponseUsage usage = usage(response);
         PricingEstimate estimate = pricing.estimateCost(usage);
         BigDecimal uncachedCost = pricing.inputMeter().costForTokens(usage.inputTokens())
                 .add(pricing.outputMeter().costForTokens(usage.outputTokens()))
@@ -124,6 +175,11 @@ class DemoRunService {
                 pricing.cachedInputMeter().map(RetailPriceMeter::meterName).orElse("not found"),
                 pricing.outputMeter().meterName());
     }
+
+        private static ResponseUsage usage(Response response) {
+                return response.usage()
+                                .orElseThrow(() -> new IllegalStateException("Usage was not returned by the service."));
+        }
 
     private static String cacheablePrompt(String runId) {
         StringBuilder builder = new StringBuilder();
@@ -170,6 +226,18 @@ class DemoRunService {
         return cachedInputTokens * 100.0 / totalInputTokens;
     }
 
+        static long tokensSaved(long sourceTokens, long compactedTokens) {
+                return Math.max(sourceTokens - compactedTokens, 0);
+        }
+
+        static double tokenReductionRate(long sourceTokens, long compactedTokens) {
+                if (sourceTokens == 0) {
+                        return 0.0;
+                }
+
+                return tokensSaved(sourceTokens, compactedTokens) * 100.0 / sourceTokens;
+        }
+
     record InstantDemoResult(
             String model,
             String prompt,
@@ -188,6 +256,18 @@ class DemoRunService {
             List<CallSummary> calls) {
     }
 
+    record CompactDemoResult(
+            String model,
+            String prompt,
+            String compactedPrompt,
+            int sourceCharacters,
+            int compactedCharacters,
+            UsageSummary usage,
+            CompactionSummary compaction,
+            CostSummary cost,
+            PricingSummary pricing) {
+    }
+
     record CallSummary(
             String label,
             String response,
@@ -201,6 +281,9 @@ class DemoRunService {
 
     record CacheSummary(long standardInputTokens, long cachedInputTokens, double cacheHitRate) {
     }
+
+        record CompactionSummary(long sourceTokens, long compactedTokens, long tokensSaved, double tokenReductionRate) {
+        }
 
     record CostSummary(
             String currencyCode,

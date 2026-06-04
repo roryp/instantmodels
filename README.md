@@ -13,6 +13,7 @@ Live app: [http://aka.ms/costs](http://aka.ms/costs)
 - [Configuration Reference](#configuration-reference)
 - [Run](#run)
 - [Prompt Cache Demo](#prompt-cache-demo)
+- [Compaction Demo](#compaction-demo)
 - [Example Output](#example-output)
 - [Cost Calculation](#cost-calculation)
     - [`gpt-chat-latest` vs `gpt-5.5` Pricing](#gpt-chat-latest-vs-gpt-55-pricing)
@@ -25,6 +26,7 @@ Token efficiency is about getting the answer you need with the smallest useful p
 - Switch off unused MCP servers and external tool connections. Tool definitions, schemas, and connection context can add tokens before the model even starts answering. In this repo, the instant demo uses the Responses API directly and does not attach tools, so the request stays small.
 - Use the smallest model that can complete the task. The app defaults to `gpt-chat-latest` because it was available for this instant-model project, but you should compare cheaper or smaller instant models when the task is summarization, classification, routing, or short Q&A.
 - Split agent work into small, scoped sessions. The instant demo asks one focused question and shows a small input footprint, for example `19` input tokens in the sample output. Avoid carrying a long conversation history into tasks that do not need it.
+- Compact or restart long assistant conversations after durable context has been captured. Conversation compaction replaces a long raw transcript with a concise working summary, so the next model call spends fewer input tokens re-reading old exploration, logs, and resolved decisions. The dashboard's Compaction Demo makes this visible: it sends long working notes to the selected instant model with a compaction instruction, then compares the service-reported source input tokens with the compacted-summary output tokens and shows tokens saved, reduction percentage, and the cost of the compaction call itself. Treat the savings as future-prompt savings, not a free operation, because the compaction call still consumes tokens. Before compacting, save important facts in code, tests, README notes, issues, or a short checklist because a compacted summary might not preserve exact wording, command output, or every discarded branch of reasoning.
 - Keep prompts and instructions precise, short, and task-specific. The instant demo prompt is a single sentence, which keeps standard input cost low. The cache demo intentionally uses a large stable prefix only to show when prompt caching helps.
 - Prefer completions before chat, agents, or cloud agent workflows when the job is a simple one-shot response. This sample calls the Responses API directly; an agent is only worth the extra orchestration and context when you need planning, tool use, state, or multi-step behavior.
 - Reuse stable long context with prompt caching. In the cache demo, the warm-up call pays for the full long prompt, while the repeated call shows most of the prefix as cached input. A verified run showed `9728` cached input tokens and about `96%` cache hit rate, reducing the estimated call cost from roughly `USD 0.051` to roughly `USD 0.007`.
@@ -40,6 +42,8 @@ Sanitized validation finding: one West US 3 subscription checked during developm
 
 This Java sample calls an instant model from a Foundry project endpoint, prints token usage, and estimates cost per call with live pricing from the Azure Retail Prices API.
 
+The dashboard includes three examples: a small instant model call, a prompt cache comparison, and a compaction demo that turns long working notes into a shorter reusable summary.
+
 The sample follows the Microsoft Foundry Java quickstart pattern with `com.azure:azure-ai-agents:2.0.0` and uses Microsoft Entra authentication through `DefaultAzureCredential`. No API key or project-specific secret is stored in this repository.
 
 ## What It Does
@@ -48,6 +52,7 @@ The sample follows the Microsoft Foundry Java quickstart pattern with `com.azure
 - Uses an instant model by name, so no model deployment is required.
 - Loads local settings from `.env`, while keeping `.env` out of git.
 - Prints the model response plus input, output, total, and cached-input token usage.
+- Compacts long working notes into a shorter reusable prompt and shows request-level token savings.
 - Looks up current prices at runtime from `https://prices.azure.com/api/retail/prices`.
 - Estimates per-call cost from the returned token usage and live retail pricing meters.
 
@@ -148,7 +153,7 @@ To run the Spring Boot web dashboard locally:
 mvn spring-boot:run
 ```
 
-Open `http://localhost:8080` and use the buttons to run the instant model demo or the prompt cache demo.
+Open `http://localhost:8080` and use the buttons to run the instant model demo, prompt cache demo, or compaction demo.
 
 Use `mvn compile exec:java` after `mvn clean` or from a fresh clone. `mvn exec:java` by itself only works after classes already exist under `target/classes`.
 
@@ -188,6 +193,19 @@ Cache details: standard-input=317 tokens, cached-input=9728 tokens, cache-hit-ra
 Estimated cost: USD 0.00746900
 Estimated cache savings versus uncached input: USD 0.04377600
 ```
+
+## Compaction Demo
+
+The dashboard also includes a compaction demo for long assistant working notes. Paste or edit the working notes, then select **Compact prompt**. The app asks the selected instant model to produce a shorter durable summary that can be reused in a later assistant turn.
+
+The result shows:
+
+- Source tokens reported by the service for the compaction request.
+- Compacted tokens reported as the response output tokens.
+- Tokens saved and reduction percentage for future prompts that use the compacted summary instead of the original notes.
+- Estimated cost of the compaction call itself.
+
+Compaction is a tradeoff: the current compaction call still costs input and output tokens, but later turns can avoid repeatedly sending the full raw transcript. Before compacting, durable facts should be captured in code, tests, README notes, issues, or a short checklist because a compacted summary might not preserve exact wording or every branch of reasoning.
 
 ## Example Output
 
@@ -259,5 +277,7 @@ So the important distinction is the billing family: `ShortCo` is the lower-cost 
     |   |   `-- RetailPricingClient.java
     |   |-- resources/application.properties
     |   `-- resources/static
-    `-- test/java/com/example/instantmodels/InstantModelsConfigTest.java
+    `-- test/java/com/example/instantmodels
+        |-- DemoRunServiceTest.java
+        `-- InstantModelsConfigTest.java
 ```
