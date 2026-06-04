@@ -1,5 +1,19 @@
 # Instant Models Java Sample
 
+Live app: [http://aka.ms/costs](http://aka.ms/costs)
+
+## Token Efficiency
+
+Token efficiency is about getting the answer you need with the smallest useful prompt, model, and tool surface. This sample makes that visible by printing input, output, cached-input, and cost for every call.
+
+- Switch off unused MCP servers and external tool connections. Tool definitions, schemas, and connection context can add tokens before the model even starts answering. In this repo, the instant demo uses the Responses API directly and does not attach tools, so the request stays small.
+- Use the smallest model that can complete the task. The app defaults to `gpt-chat-latest` because it was available for this instant-model project, but you should compare cheaper or smaller instant models when the task is summarization, classification, routing, or short Q&A.
+- Split agent work into small, scoped sessions. The instant demo asks one focused question and shows a small input footprint, for example `19` input tokens in the sample output. Avoid carrying a long conversation history into tasks that do not need it.
+- Keep prompts and instructions precise, short, and task-specific. The instant demo prompt is a single sentence, which keeps standard input cost low. The cache demo intentionally uses a large stable prefix only to show when prompt caching helps.
+- Prefer completions before chat, agents, or cloud agent workflows when the job is a simple one-shot response. This sample calls the Responses API directly; an agent is only worth the extra orchestration and context when you need planning, tool use, state, or multi-step behavior.
+- Reuse stable long context with prompt caching. In the cache demo, the warm-up call pays for the full long prompt, while the repeated call shows most of the prefix as cached input. A verified run showed `9728` cached input tokens and about `96%` cache hit rate, reducing the estimated call cost from roughly `USD 0.051` to roughly `USD 0.007`.
+- Watch both input and output. Short prompts can still get expensive if they produce long answers. The dashboard shows output tokens and output cost separately so you can tighten response length when needed.
+
 Instant models in Microsoft Foundry let you call supported models by name without first creating a deployment. They are useful for prototyping, comparing models, trying new releases quickly, and building early application flows before you decide whether you need a dedicated deployment for reserved throughput, custom controls, or production isolation.
 
 This Java sample calls an instant model from a Foundry project endpoint, prints token usage, and estimates cost per call with live pricing from the Azure Retail Prices API.
@@ -17,7 +31,7 @@ The sample follows the Microsoft Foundry Java quickstart pattern with `com.azure
 
 ## Prerequisites
 
-- Java 17 or newer
+- Java 21 or newer
 - Maven 3.9 or newer
 - Azure CLI
 - A Microsoft Foundry project in a region that supports instant models during preview
@@ -68,8 +82,6 @@ azd up
 ```
 
 `azd up` provisions the Azure resources, builds the Spring Boot Docker image locally, pushes it to Azure Container Registry, deploys it to Azure Container Apps, and prints the live endpoint. Local Docker must be running because this template intentionally disables ACR remote build.
-
-Live app shortcut: [http://aka.ms/costs](http://aka.ms/costs)
 
 For later code-only updates, run:
 
@@ -203,18 +215,6 @@ Current `westus3` global retail meters:
 | `5.5 LongCo` | USD 10 / 1M | USD 1 / 1M | USD 45 / 1M |
 
 So the important distinction is the billing family: `ShortCo` is the lower-cost path, and `LongCo` costs more. In this app, the observed `gpt-5.5` call also resolves to `5.5 ShortCo`, so it has the same per-token rates as `gpt-chat-latest` for the tested configuration.
-
-## Token Efficiency
-
-Token efficiency is about getting the answer you need with the smallest useful prompt, model, and tool surface. This sample makes that visible by printing input, output, cached-input, and cost for every call.
-
-- Switch off unused MCP servers and external tool connections. Tool definitions, schemas, and connection context can add tokens before the model even starts answering. In this repo, the instant demo uses the Responses API directly and does not attach tools, so the request stays small.
-- Use the smallest model that can complete the task. The app defaults to `gpt-chat-latest` because it was available for this instant-model project, but you should compare cheaper or smaller instant models when the task is summarization, classification, routing, or short Q&A.
-- Split agent work into small, scoped sessions. The instant demo asks one focused question and shows a small input footprint, for example `19` input tokens in the sample output. Avoid carrying a long conversation history into tasks that do not need it.
-- Keep prompts and instructions precise, short, and task-specific. The instant demo prompt is a single sentence, which keeps standard input cost low. The cache demo intentionally uses a large stable prefix only to show when prompt caching helps.
-- Prefer completions before chat, agents, or cloud agent workflows when the job is a simple one-shot response. This sample calls the Responses API directly; an agent is only worth the extra orchestration and context when you need planning, tool use, state, or multi-step behavior.
-- Reuse stable long context with prompt caching. In the cache demo, the warm-up call pays for the full long prompt, while the repeated call shows most of the prefix as cached input. A verified run showed `9728` cached input tokens and about `96%` cache hit rate, reducing the estimated call cost from roughly `USD 0.051` to roughly `USD 0.007`.
-- Watch both input and output. Short prompts can still get expensive if they produce long answers. The dashboard shows output tokens and output cost separately so you can tighten response length when needed.
 
 ## Project Layout
 
