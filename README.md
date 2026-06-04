@@ -7,6 +7,7 @@ Live app: [http://aka.ms/costs](http://aka.ms/costs)
 - [Token Efficiency](#token-efficiency)
 - [Example overview](#example-overview)
 - [What It Does](#what-it-does)
+- [Screenshots](#screenshots)
 - [Prerequisites](#prerequisites)
 - [Configure](#configure)
 - [Provision Azure Resources](#provision-azure-resources)
@@ -55,6 +56,24 @@ The sample follows the Microsoft Foundry Java quickstart pattern with `com.azure
 - Compacts long working notes into a shorter reusable prompt and shows request-level token savings.
 - Looks up current prices at runtime from `https://prices.azure.com/api/retail/prices`.
 - Estimates per-call cost from the returned token usage and live retail pricing meters.
+
+## Screenshots
+
+![Instant Models Lab dashboard](article-assets/instant-models-dashboard.png)
+
+The dashboard presents the three token-efficiency workflows side by side: instant model calls, prompt cache reuse, and prompt compaction.
+
+![Instant Models Lab token efficiency results](article-assets/instant-models-results.png)
+
+Representative result view showing input tokens, cached input tokens, estimated cost, and compaction savings. Live values vary by model, prompt, region, quota, and current retail pricing response.
+
+![Prompt cache demo results](article-assets/prompt-cache-results.png)
+
+The prompt cache demo compares a warm-up call with a repeated call that reuses the stable prompt prefix and reports cached input tokens.
+
+![Compaction demo results](article-assets/compaction-results.png)
+
+The compaction demo shows how long working notes can be turned into a shorter reusable summary, while still accounting for the cost of the compaction call itself.
 
 ## Prerequisites
 
