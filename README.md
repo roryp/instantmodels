@@ -191,6 +191,19 @@ cost = (standard_input_tokens / 1,000,000 * input_price_per_1M_tokens)
 
 The Azure Retail Prices API is queried at runtime, so the estimate reflects the current public retail catalog response for the configured model meter prefix, region, currency, and scope. Your actual bill can still differ if your subscription has discounts, commitments, credits, or private pricing.
 
+### `gpt-chat-latest` vs `gpt-5.5` Pricing
+
+In this demo, `gpt-chat-latest` maps to the `5.5 ShortCo` retail meters. That makes it cheaper than a `5.5 LongCo` path, but not cheaper than `gpt-5.5` when `gpt-5.5` is also billed as `ShortCo`.
+
+Current `westus3` global retail meters:
+
+| Meter family | Input | Cached input | Output |
+| --- | ---: | ---: | ---: |
+| `5.5 ShortCo` | USD 5 / 1M | USD 0.50 / 1M | USD 30 / 1M |
+| `5.5 LongCo` | USD 10 / 1M | USD 1 / 1M | USD 45 / 1M |
+
+So the important distinction is the billing family: `ShortCo` is the lower-cost path, and `LongCo` costs more. In this app, the observed `gpt-5.5` call also resolves to `5.5 ShortCo`, so it has the same per-token rates as `gpt-chat-latest` for the tested configuration.
+
 ## Token Efficiency
 
 Token efficiency is about getting the answer you need with the smallest useful prompt, model, and tool surface. This sample makes that visible by printing input, output, cached-input, and cost for every call.
