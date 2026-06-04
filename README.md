@@ -46,6 +46,32 @@ FOUNDRY_PROJECT_ENDPOINT=https://<resource-name>.services.ai.azure.com/api/proje
 
 The app reads real environment variables first, then falls back to `.env`. This lets CI/CD or shell variables override local development settings.
 
+## Provision Azure Resources
+
+This repo includes an Azure Developer CLI (`azd`) and Bicep setup that creates the resources needed for the sample:
+
+- Resource group
+- Azure AI Services account with Foundry project management enabled
+- Microsoft Foundry project
+- Azure AI User role assignment for the signed-in deployer on the Foundry project
+
+The default location is `westus3`, which is the preview region used for instant model testing.
+
+```powershell
+az login
+azd auth login
+azd env new instantmodels --location westus3
+azd provision
+```
+
+After provisioning, copy the emitted `FOUNDRY_PROJECT_ENDPOINT` value into your local `.env` file. The `.env` file is ignored by git.
+
+To remove the Azure resources later:
+
+```powershell
+azd down
+```
+
 ## Configuration Reference
 
 | Setting | Required | Default | Description |
