@@ -69,6 +69,8 @@ azd up
 
 `azd up` provisions the Azure resources, builds the Spring Boot Docker image locally, pushes it to Azure Container Registry, deploys it to Azure Container Apps, and prints the live endpoint. Local Docker must be running because this template intentionally disables ACR remote build.
 
+Live app shortcut: [http://aka.ms/costs](http://aka.ms/costs)
+
 For later code-only updates, run:
 
 ```powershell
