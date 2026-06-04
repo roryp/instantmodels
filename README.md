@@ -191,6 +191,18 @@ cost = (standard_input_tokens / 1,000,000 * input_price_per_1M_tokens)
 
 The Azure Retail Prices API is queried at runtime, so the estimate reflects the current public retail catalog response for the configured model meter prefix, region, currency, and scope. Your actual bill can still differ if your subscription has discounts, commitments, credits, or private pricing.
 
+## Token Efficiency
+
+Token efficiency is about getting the answer you need with the smallest useful prompt, model, and tool surface. This sample makes that visible by printing input, output, cached-input, and cost for every call.
+
+- Switch off unused MCP servers and external tool connections. Tool definitions, schemas, and connection context can add tokens before the model even starts answering. In this repo, the instant demo uses the Responses API directly and does not attach tools, so the request stays small.
+- Use the smallest model that can complete the task. The app defaults to `gpt-chat-latest` because it was available for this instant-model project, but you should compare cheaper or smaller instant models when the task is summarization, classification, routing, or short Q&A.
+- Split agent work into small, scoped sessions. The instant demo asks one focused question and shows a small input footprint, for example `19` input tokens in the sample output. Avoid carrying a long conversation history into tasks that do not need it.
+- Keep prompts and instructions precise, short, and task-specific. The instant demo prompt is a single sentence, which keeps standard input cost low. The cache demo intentionally uses a large stable prefix only to show when prompt caching helps.
+- Prefer completions before chat, agents, or cloud agent workflows when the job is a simple one-shot response. This sample calls the Responses API directly; an agent is only worth the extra orchestration and context when you need planning, tool use, state, or multi-step behavior.
+- Reuse stable long context with prompt caching. In the cache demo, the warm-up call pays for the full long prompt, while the repeated call shows most of the prefix as cached input. A verified run showed `9728` cached input tokens and about `96%` cache hit rate, reducing the estimated call cost from roughly `USD 0.051` to roughly `USD 0.007`.
+- Watch both input and output. Short prompts can still get expensive if they produce long answers. The dashboard shows output tokens and output cost separately so you can tighten response length when needed.
+
 ## Project Layout
 
 ```text
