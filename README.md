@@ -2,6 +2,22 @@
 
 Live app: [http://aka.ms/costs](http://aka.ms/costs)
 
+## Contents
+
+- [Token Efficiency](#token-efficiency)
+- [Example overview](#example-overview)
+- [What It Does](#what-it-does)
+- [Prerequisites](#prerequisites)
+- [Configure](#configure)
+- [Provision Azure Resources](#provision-azure-resources)
+- [Configuration Reference](#configuration-reference)
+- [Run](#run)
+- [Prompt Cache Demo](#prompt-cache-demo)
+- [Example Output](#example-output)
+- [Cost Calculation](#cost-calculation)
+    - [`gpt-chat-latest` vs `gpt-5.5` Pricing](#gpt-chat-latest-vs-gpt-55-pricing)
+- [Project Layout](#project-layout)
+
 ## Token Efficiency
 
 Token efficiency is about getting the answer you need with the smallest useful prompt, model, and tool surface. This sample makes that visible by printing input, output, cached-input, and cost for every call.
@@ -13,6 +29,8 @@ Token efficiency is about getting the answer you need with the smallest useful p
 - Prefer completions before chat, agents, or cloud agent workflows when the job is a simple one-shot response. This sample calls the Responses API directly; an agent is only worth the extra orchestration and context when you need planning, tool use, state, or multi-step behavior.
 - Reuse stable long context with prompt caching. In the cache demo, the warm-up call pays for the full long prompt, while the repeated call shows most of the prefix as cached input. A verified run showed `9728` cached input tokens and about `96%` cache hit rate, reducing the estimated call cost from roughly `USD 0.051` to roughly `USD 0.007`.
 - Watch both input and output. Short prompts can still get expensive if they produce long answers. The dashboard shows output tokens and output cost separately so you can tighten response length when needed.
+
+## Example overview
 
 Instant models in Microsoft Foundry let you call supported models by name without first creating a deployment. They are useful for prototyping, comparing models, trying new releases quickly, and building early application flows before you decide whether you need a dedicated deployment for reserved throughput, custom controls, or production isolation.
 
@@ -239,50 +257,3 @@ So the important distinction is the billing family: `ShortCo` is the lower-cost 
     |   `-- resources/static
     `-- test/java/com/example/instantmodels/InstantModelsConfigTest.java
 ```
-
-## Troubleshooting
-
-### `ClassNotFoundException: InstantModelsApp`
-
-Run the compile phase first:
-
-```powershell
-mvn compile exec:java
-```
-
-This happens after `mvn clean` because `mvn exec:java` alone does not compile classes.
-
-### `Set FOUNDRY_PROJECT_ENDPOINT`
-
-Create `.env` from `.env.example` and set `FOUNDRY_PROJECT_ENDPOINT`, or set it as a real environment variable before running Maven.
-
-### Authentication Errors
-
-Run `az login`, then confirm the signed-in user has the Foundry User role on the Foundry project or account.
-
-### Pricing Meter Not Found
-
-The selected model might be an alias or might map to a different retail meter family. Set `FOUNDRY_PRICING_METER_PREFIX` to the matching Azure Retail Prices meter prefix, then rerun.
-
-### Model Not Available
-
-Instant models are preview features and availability can vary by region, subscription, and quota. Set `FOUNDRY_MODEL` to another instant-capable model shown in your Foundry model catalog.
-
-## GitHub Safety
-
-The local `.env` file is intentionally ignored by [.gitignore](.gitignore). Commit [.env.example](.env.example), not `.env`.
-
-Before pushing, a good final check is:
-
-```powershell
-mvn test
-mvn clean
-```
-
-This repository should not contain API keys, project endpoints, access tokens, Maven build output, IDE folders, or log files.
-
-## Notes
-
-- During preview, instant models require a supported Foundry project region. The original test project used West US 3.
-- The sample currently defaults to `gpt-chat-latest` because it was available in the tested subscription.
-- The pricing lookup is unauthenticated and uses public retail prices, not negotiated enterprise rates.
