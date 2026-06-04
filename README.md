@@ -36,6 +36,8 @@ Instant models in Microsoft Foundry let you call supported models by name withou
 
 Instant models are still quota-governed. During preview, they draw from a per-model global quota pool assigned to your subscription, and requests can be throttled if available capacity is exceeded. If you see rate-limit responses such as HTTP 429, add retry logic with backoff and consider requesting a quota increase or moving production traffic to a deployment with reserved capacity. See [Instant models in Microsoft Foundry](https://learn.microsoft.com/en-us/azure/foundry/concepts/instant-models) and [Microsoft Foundry Models quotas and limits](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/quotas-limits) for the current guidance.
 
+Sanitized validation finding: one West US 3 subscription checked during development reported a Tier 5 `gpt-chat-latest` Global Standard quota of `50,000` requests per minute and `5,000,000` tokens per minute, with no Global Standard deployment quota reserved at the time of the check. Treat this as a point-in-time example only; your subscription, quota tier, model, region, and reserved deployments can change the effective limit. Runtime response headers such as `x-ratelimit-limit-tokens`, `x-ratelimit-remaining-tokens`, and `retry-after-ms` are the best signal for live throttling behavior.
+
 This Java sample calls an instant model from a Foundry project endpoint, prints token usage, and estimates cost per call with live pricing from the Azure Retail Prices API.
 
 The sample follows the Microsoft Foundry Java quickstart pattern with `com.azure:azure-ai-agents:2.0.0` and uses Microsoft Entra authentication through `DefaultAzureCredential`. No API key or project-specific secret is stored in this repository.
