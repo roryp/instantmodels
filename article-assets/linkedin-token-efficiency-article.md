@@ -2,53 +2,29 @@
 
 ## A Java demo with Microsoft Foundry instant models
 
-Live app: [http://aka.ms/costs](http://aka.ms/costs)
+Live demo: [http://aka.ms/costs](http://aka.ms/costs)
+
+Repo: [https://github.com/roryp/instantmodels](https://github.com/roryp/instantmodels)
 
 ![Instant Models Lab dashboard](instant-models-dashboard.png){ width=6.5in }
 
 *The dashboard starts with three focused workflows: a small instant model call, a prompt cache comparison, and a compaction demo.*
 
-## The Main Idea
+## Why I Built This
 
-Token efficiency is not about making prompts tiny at all costs. It is about sending the smallest useful prompt, model, and tool surface for the job in front of you.
+Token efficiency is becoming an important part of how we design, build, and operate AI applications. As more teams move from experimentation into production, the question is no longer only whether a model can produce a useful answer. The question is also how much context was required, how much output was generated, whether any of the input was cached, and what the estimated cost of that interaction was.
 
-In this demo, every workflow answers the same practical question: what did we ask the model to read, what did it produce, and what did that cost?
+I built a small Java demo to make those tradeoffs visible. The demo uses Microsoft Foundry instant models and shows three common patterns that affect token usage: direct model calls, prompt caching, and conversation compaction. It also connects token usage to pricing so that cost is not treated as an abstract concern or a surprise that only shows up later.
 
-The app keeps these signals on screen:
+For me, that is the useful part. Token efficiency should be visible while an application is being designed, not only after it is already running in production.
 
-- Input tokens
-- Output tokens
-- Cached input tokens
-- Cache hit rate
-- Live retail price meters
-- Estimated cost per call
-- Tokens saved by compaction
+## Instant Models
 
-That turns cost from an afterthought into a design signal.
+The first part of the demo is a direct instant model call. This is the simplest pattern: a focused prompt is sent to the model, the response comes back, and the application displays the token usage and estimated cost.
 
-## What The Demo Shows
+This matters because not every task needs agent orchestration, tool calling, long-running context, or a large instruction surface. For simple work, a direct model call can be easier to understand, easier to measure, and often more efficient.
 
-The demo has three modes.
-
-**1. Instant Demo**
-
-A single focused prompt goes straight to a Foundry instant model through the Responses API. There is no agent orchestration and no extra tool schema attached to the request. For a simple one-shot answer, that keeps the input footprint small.
-
-**2. Prompt Cache Demo**
-
-The app sends the same long reference prompt twice with a stable `promptCacheKey`. The first call pays for the full prefix. The repeated call can reuse the cached prefix, shifting most input tokens into the cached-input meter.
-
-**3. Compaction Demo**
-
-The app takes long working notes and asks the model to produce a shorter durable summary for the next assistant turn. The point is honest accounting: compaction itself costs tokens, but the compacted summary can save future prompts from repeatedly carrying the whole transcript.
-
-![Dashboard populated with representative result metrics](instant-models-results.png){ width=6.5in }
-
-*Representative metric view using sample values from the README and article capture data. Live values vary by model, region, prompt, quota, and pricing response.*
-
-## Code Example: A Direct Instant Model Call
-
-The fast path uses the Responses API directly. That matters because agent frameworks are valuable when you need planning, tools, state, or multi-step behavior, but they are not free. For a simple prompt, direct model access keeps the request surface small.
+The code path is intentionally small:
 
 ```java
 Response response = responsesClient().getResponseService().create(new ResponseCreateParams.Builder()
@@ -57,57 +33,51 @@ Response response = responsesClient().getResponseService().create(new ResponseCr
         .build());
 ```
 
-The client is built with Microsoft Entra authentication through `DefaultAzureCredential`, which keeps API keys out of the sample.
+The client uses Microsoft Entra authentication through `DefaultAzureCredential`, which keeps API keys out of the sample and makes the demo closer to the pattern I would want in a real app.
 
-```java
-private ResponsesClient responsesClient() {
-    return new AgentsClientBuilder()
-            .credential(new DefaultAzureCredentialBuilder().build())
-            .endpoint(InstantModelsConfig.projectEndpoint())
-            .buildResponsesClient();
-}
-```
+![Dashboard populated with representative result metrics](instant-models-results.png){ width=6.5in }
 
-That is the kind of default I like in demos: fewer secrets, fewer moving parts, and a shorter path from idea to measurement.
+*Representative metric view using sample values from the README and article capture data. Live values vary by model, region, prompt, quota, and pricing response.*
 
-## Code Example: Prompt Caching
+## What About Agents?
 
-Prompt caching is useful when a large part of the prompt is stable across calls. In this demo, the cache workflow creates a fresh key for each run, sends a long reusable reference prompt, and repeats it.
+This does not mean agents are the wrong pattern. Agents are valuable when the application needs planning, tools, iteration, and multi-step execution.
 
-```java
-private Response createCachedResponse(String prompt, String cacheKey) {
-    ResponseCreateParams responseRequest = new ResponseCreateParams.Builder()
-            .input(prompt)
-            .model(InstantModelsConfig.model())
-            .maxOutputTokens(80)
-            .promptCacheKey(cacheKey)
-            .build();
+The point is that those capabilities have a cost. Tool schemas, instructions, previous messages, attached context, and external connections can all increase the amount of information sent to the model. Token efficiency starts by matching the architecture to the task instead of defaulting every interaction to the heaviest possible workflow.
 
-    return responsesClient().getResponseService().create(responseRequest);
-}
-```
+In practice, that means using agents when their extra capabilities are actually part of the product experience, and using simpler model calls when the job is small and well scoped.
 
-The result is easy to explain to a team: if your app keeps sending the same policy document, catalog, rubric, or reference context, prompt caching can turn repeated context into a measurable optimization.
+## Prompt Caching
+
+The second part of the demo shows prompt caching. Many AI applications repeatedly send the same large body of context to the model. This might be a policy document, a product catalogue, a coding standard, a rubric, or a long set of instructions.
+
+When that stable context is reused across calls, prompt caching can reduce the cost of repeated input by allowing the reusable prefix to be billed differently from fresh input.
+
+The important design point is that caching works best when the reusable context is deliberate and stable. If the prompt changes constantly, the cache benefit is reduced. This pushes teams to think more carefully about prompt structure. Stable context should be separated from request-specific context. Instructions should be consistent where possible. Large reference material should not be casually mixed with volatile user input if the goal is to benefit from caching.
+
+In the demo, the cache workflow sends the same long reference prompt twice with a stable `promptCacheKey`. The first call pays for the full prefix. The repeated call can reuse the cached prefix, shifting most of the repeated input into the cached-input meter.
 
 ![Prompt cache result panel](prompt-cache-results.png){ width=6.2in }
 
 *The repeated call keeps the same total input size, but most of the reusable prefix is reported as cached input.*
 
-## Code Example: Live Cost Estimation
+## Compaction
 
-A useful token dashboard should not stop at token counts. This sample looks up current Azure Retail Prices API meters at runtime and combines those meters with service-reported usage.
+The third part of the demo shows conversation compaction. Long-running assistant sessions can become expensive when every new request carries the full history of exploration, debugging, false starts, decisions, logs, and intermediate discussion.
 
-```java
-BigDecimal standardInputCost = inputMeter.costForTokens(standardInputTokens);
-BigDecimal cachedInputCost = cachedInputMeter
-        .map(meter -> meter.costForTokens(cachedInputTokens))
-        .orElseGet(() -> inputMeter.costForTokens(cachedInputTokens));
-BigDecimal outputCost = outputMeter.costForTokens(usage.outputTokens());
-BigDecimal totalCost = standardInputCost.add(cachedInputCost).add(outputCost)
-        .setScale(8, RoundingMode.HALF_UP);
-```
+Some of that history is useful. Some of it is no longer necessary. Compaction creates a shorter summary that can be used as future context instead of repeatedly sending the entire conversation.
 
-The cost formula is intentionally transparent:
+Compaction is not free, because the compaction step itself uses tokens. The benefit comes when the shorter summary is reused in later calls. That makes compaction an engineering tradeoff rather than a generic best practice. It is most useful when a session is long enough that the future savings outweigh the cost of summarising the current context.
+
+![Compaction result panel](compaction-results.png){ width=6.2in }
+
+*Compaction is not free. The win comes when the shorter summary replaces repeated raw context in later turns.*
+
+## Pricing
+
+The demo also uses pricing information so that token counts can be connected to estimated cost. This is important because token usage alone is only part of the story. Input tokens, cached input tokens, and output tokens can have different rates.
+
+A useful application should make those categories visible so developers can understand what is driving cost. The calculation is intentionally straightforward: standard input tokens, cached input tokens, and output tokens are counted separately and then matched against the relevant pricing meters from the Azure Retail Prices API.
 
 ```text
 cost = standard_input_tokens * standard_input_rate
@@ -115,56 +85,24 @@ cost = standard_input_tokens * standard_input_rate
      + output_tokens * output_rate
 ```
 
-The sample maps `gpt-chat-latest` to the `5.5 ShortCo` retail meter family by default, while still allowing a meter-prefix override through environment configuration.
+This gives developers and product teams a clearer view of where cost is coming from and what can be changed. A team might reduce repeated input through caching, reduce unnecessary output with better response constraints, or avoid loading tools that are not needed for a particular workflow.
 
-## Code Example: Compaction As Conversation Hygiene
+This is also where token efficiency becomes a product design concern. It is not only an infrastructure or finance issue. A product that sends too much context, keeps unnecessary tools enabled, or allows sessions to grow indefinitely will behave differently from one that is designed with scoped prompts, stable reusable context, and clear workflow boundaries.
 
-Long assistant conversations become expensive when every turn drags old exploration, logs, and resolved decisions back into the next model call. The compaction demo turns that into a visible tradeoff.
+## Practical Lessons
 
-```java
-Response response = responsesClient().getResponseService().create(new ResponseCreateParams.Builder()
-        .input(prompt)
-        .instructions(COMPACTION_INSTRUCTIONS)
-        .model(InstantModelsConfig.model())
-        .maxOutputTokens(360)
-        .build());
-```
+There are a few practical lessons from the demo:
 
-Then the app compares the service-reported source input tokens with the compacted output tokens.
+- Use direct model calls when the task is simple.
+- Use the smallest model that can reliably complete the work.
+- Keep prompts specific and avoid attaching unnecessary context.
+- Disable unused MCP servers and external tools when they are not needed.
+- Separate stable context from request-specific context so caching can be effective.
+- Compact long sessions when the future savings justify it.
+- Measure output tokens as carefully as input tokens, because long responses also affect cost.
+- Price against live meters instead of stale assumptions.
 
-```java
-static long tokensSaved(long sourceTokens, long compactedTokens) {
-    return Math.max(sourceTokens - compactedTokens, 0);
-}
-
-static double tokenReductionRate(long sourceTokens, long compactedTokens) {
-    if (sourceTokens == 0) {
-        return 0.0;
-    }
-
-    return tokensSaved(sourceTokens, compactedTokens) * 100.0 / sourceTokens;
-}
-```
-
-![Compaction result panel](compaction-results.png){ width=6.2in }
-
-*Compaction is not free. The win comes when the shorter summary replaces repeated raw context in later turns.*
-
-## Why This Matters
-
-The easiest way to waste tokens is to make every request carry everything: the whole chat history, every tool definition, every schema, every old log, every unresolved thought. That can be useful during exploration, but it should not become the default shape of production calls.
-
-This demo makes a better habit visible:
-
-- Use direct model calls for simple one-shot work.
-- Use the smallest model that can complete the task.
-- Attach tools only when the model actually needs them.
-- Reuse stable long context with prompt caching.
-- Compact or restart long conversations after durable facts are captured.
-- Watch output tokens too, because short prompts can still produce expensive answers.
-- Price against live meters instead of stale spreadsheet assumptions.
-
-Token efficiency is not just cost control. It improves latency, makes behavior easier to reason about, reduces accidental context leakage, and gives teams a shared language for AI application design.
+None of these are dramatic by themselves. They are small design choices that add up, especially when an AI feature moves from a prototype to something used repeatedly by real people.
 
 ## Try The Demo
 
@@ -198,10 +136,10 @@ azd up
 
 ## My Takeaway
 
-The best AI engineering demos do not only prove that a model can answer. They show how the application thinks about context, cost, and operational tradeoffs.
+The most useful part of this demo is that it makes token efficiency visible during development. Developers should not have to wait for a billing surprise before they start asking how much context their application is sending.
 
-That is what I like about this sample: token efficiency is visible in the product surface. You can see the input, the output, the cached portion, the live price meters, and the estimated cost. You can compare a tiny prompt with a cached long prompt. You can see compaction as a practical engineering choice instead of a vague best practice.
+Token efficiency is not about making prompts as small as possible. It is about using the right amount of context, the right model, and the right workflow for the job. That makes applications easier to reason about, easier to operate, and more predictable in production.
 
-In a world where every extra token can become latency, cost, and complexity, that visibility is the feature.
+Live demo: [http://aka.ms/costs](http://aka.ms/costs)
 
-Live app: [http://aka.ms/costs](http://aka.ms/costs)
+Repo: [https://github.com/roryp/instantmodels](https://github.com/roryp/instantmodels)

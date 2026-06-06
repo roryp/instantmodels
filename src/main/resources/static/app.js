@@ -80,23 +80,62 @@ function renderCacheRun(run, pricing) {
 function renderCompaction(data) {
     const compaction = data.compaction;
     const cost = data.cost;
-    const reductionWidth = Math.max(0, Math.min(100, compaction.tokenReductionRate));
+    const sourceTokens = Number(compaction.sourceTokens) || 0;
+    const compactedTokens = Number(compaction.compactedTokens) || 0;
+    const tokensSaved = Number(compaction.tokensSaved) || 0;
+    const reductionRate = Number(compaction.tokenReductionRate) || 0;
+    const keptPercent = sourceTokens > 0 ? Math.max(0, Math.min(100, (compactedTokens / sourceTokens) * 100)) : 0;
+    const freedPercent = Math.max(0, 100 - keptPercent);
+    const ratio = compactedTokens > 0 ? sourceTokens / compactedTokens : 0;
+    const ratioLabel = ratio >= 1.05 ? `${ratio.toFixed(1)}\u00d7 smaller` : 'about the same size';
+
+    // Size the before/after panels so their visible heights echo the token proportion:
+    // the compacted panel is roughly as tall as the share of tokens it keeps.
+    const beforeMaxHeight = 240;
+    const afterMaxHeight = Math.max(72, Math.round(beforeMaxHeight * (keptPercent / 100)));
 
     compactResult.className = 'result';
     compactResult.innerHTML = `
-        <p class="answer">${escapeHtml(data.compactedPrompt)}</p>
-        <div class="metrics">
-            <div class="metric"><strong>${formatInteger(compaction.sourceTokens)}</strong><span>Source tokens</span></div>
-            <div class="metric"><strong>${formatInteger(compaction.compactedTokens)}</strong><span>Compacted tokens</span></div>
-            <div class="metric"><strong>${formatInteger(compaction.tokensSaved)}</strong><span>Tokens saved</span></div>
+        <div class="compaction-headline">
+            <div class="headline-figure">
+                <strong>${Math.round(reductionRate)}%</strong>
+                <span>fewer tokens</span>
+            </div>
+            <div class="headline-meta">
+                <span class="headline-ratio">${ratioLabel}</span>
+                <span class="headline-saved">${formatInteger(tokensSaved)} tokens reclaimed on every future reuse</span>
+            </div>
         </div>
-        <div class="cache-bar" aria-label="Token reduction ${formatPercent(compaction.tokenReductionRate)}">
-            <div class="compact-fill" style="width: ${reductionWidth}%"></div>
+        <div class="budget" aria-label="Of ${formatInteger(sourceTokens)} original tokens, ${formatInteger(compactedTokens)} kept and ${formatInteger(tokensSaved)} reclaimed">
+            <div class="budget-track">
+                <div class="budget-kept" style="width: ${keptPercent}%"><span>${formatInteger(compactedTokens)} kept</span></div>
+                <div class="budget-freed" style="width: ${freedPercent}%"><span>${formatInteger(tokensSaved)} reclaimed</span></div>
+            </div>
+            <div class="budget-legend">
+                <span class="legend-item"><span class="swatch kept"></span>Durable context kept</span>
+                <span class="legend-item"><span class="swatch freed"></span>Reclaimed for future turns</span>
+            </div>
+        </div>
+        <div class="compaction-columns">
+            <div class="text-col text-before">
+                <div class="text-col-head">
+                    <span class="text-col-label">Before · working notes</span>
+                    <span class="text-col-count">${formatInteger(sourceTokens)} tokens</span>
+                </div>
+                <div class="text-body" style="max-height: ${beforeMaxHeight}px">${escapeHtml(data.prompt)}</div>
+            </div>
+            <div class="text-col text-after">
+                <div class="text-col-head">
+                    <span class="text-col-label">After · compacted context</span>
+                    <span class="text-col-count">${formatInteger(compactedTokens)} tokens</span>
+                </div>
+                <div class="text-body" style="max-height: ${afterMaxHeight}px">${escapeHtml(data.compactedPrompt)}</div>
+            </div>
         </div>
         <p class="fine-print">Reduction: ${formatPercent(compaction.tokenReductionRate)} · Source characters: ${formatInteger(data.sourceCharacters)} · Compacted characters: ${formatInteger(data.compactedCharacters)}</p>
         <p class="fine-print">Compaction call usage: input ${formatInteger(data.usage.inputTokens)} tokens · output ${formatInteger(data.usage.outputTokens)} tokens · total ${formatInteger(data.usage.totalTokens)} tokens</p>
         <p class="fine-print">Estimated compaction cost: ${cost.currencyCode} ${cost.total} (input ${cost.currencyCode} ${cost.standardInput}, output ${cost.currencyCode} ${cost.output})</p>
-        <p class="fine-print">Source tokens are request-level input tokens reported by the service, including the submitted notes and compaction instructions.</p>
+        <p class="fine-print">Token counts come from the model API. Source tokens include the submitted notes and compaction instructions; reclaimed tokens are saved on each future turn that reuses the summary instead of the raw notes.</p>
     `;
 }
 
