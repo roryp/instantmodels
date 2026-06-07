@@ -12,3 +12,5 @@ infra/main.json
 *.log
 *.class
 *.iml
+article-assets/capture-article-screenshots.js
+article-assets/capture-article-screenshots.js

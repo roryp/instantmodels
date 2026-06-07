@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Instant Models Lab</title>
-    <link rel="stylesheet" href="/styles.css?v=20260606-compaction-v2">
+    <link rel="stylesheet" href="/styles.css?v=20260607-cache-v2">
 </head>
 <body>
     <main class="shell">
@@ -25,15 +25,16 @@
             <article class="panel instant-panel">
                 <div class="panel-heading">
                     <div>
-                        <p class="eyebrow">Fast path</p>
+                        <p class="eyebrow">Live pricing</p>
                         <h2>Instant Demo</h2>
                     </div>
                     <span class="chip">1 call</span>
                 </div>
+                <p class="panel-copy">One instant model call, priced live against Azure Retail Prices meters. See the real input, cached, and output rates, then watch a fraction-of-a-cent call scale to 1,000 and 1M runs.</p>
                 <label for="promptBox">Prompt</label>
                 <textarea id="promptBox" rows="5">In one sentence, why are instant models useful for prototyping?</textarea>
-                <button id="instantButton" class="action action-primary" type="button">Run instant model</button>
-                <div id="instantResult" class="result empty">Ready for a quick call.</div>
+                <button id="instantButton" class="action action-primary" type="button">Run instant model &amp; price it</button>
+                <div id="instantResult" class="result empty">Ready to price a live call.</div>
             </article>
 
             <article class="panel cache-panel">
@@ -44,9 +45,9 @@
                     </div>
                     <span class="chip">2 calls</span>
                 </div>
-                <p class="panel-copy">Uses a long stable reference prompt and a fresh cache key. The warm-up call primes the cache; the repeated call should show cached input tokens and lower estimated cost.</p>
-                <button id="cacheButton" class="action action-secondary" type="button">Run cache demo</button>
-                <div id="cacheResult" class="result empty">Ready to show cache reuse.</div>
+                <p class="panel-copy">Watch the model cache warm up in real time. A warm-up call primes a long stable prefix, then the repeated call reuses it &mdash; see the cache fill, the cold&rarr;warm comparison, and exactly what was loaded.</p>
+                <button id="cacheButton" class="action action-secondary" type="button">Warm the cache</button>
+                <div id="cacheResult" class="result empty">Ready to warm the cache.</div>
             </article>
 
             <article class="panel compact-panel">
@@ -69,6 +70,6 @@ Open question: after the docs update, add a dashboard example that compacts long
             </article>
         </section>
     </main>
-    <script src="/app.js?v=20260606-compaction-v2"></script>
+    <script src="/app.js?v=20260607-cache-v2"></script>
 </body>
 </html>

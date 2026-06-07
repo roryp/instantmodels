@@ -16,6 +16,32 @@ const escapeHtml = (value) => String(value ?? '')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
 
+// Money small enough to be a fraction of a cent needs more precision than a
+// rounded-up projection of the same call run thousands of times.
+const formatMoney = (value, currencyCode) => {
+    const amount = Number(value) || 0;
+    let decimals = 2;
+    if (amount > 0 && amount < 0.0001) {
+        decimals = 8;
+    } else if (amount > 0 && amount < 0.01) {
+        decimals = 6;
+    } else if (amount > 0 && amount < 1) {
+        decimals = 4;
+    }
+    return `${currencyCode} ${amount.toFixed(decimals)}`;
+};
+
+const formatRate = (value, currencyCode) => {
+    const amount = Number(value) || 0;
+    const decimals = amount > 0 && amount < 1 ? 3 : 2;
+    return `${currencyCode} ${amount.toFixed(decimals)}`;
+};
+
+const formatClock = (iso) => {
+    const when = new Date(iso);
+    return Number.isNaN(when.getTime()) ? String(iso ?? '') : when.toLocaleTimeString();
+};
+
 async function postJson(url, body) {
     const response = await fetch(url, {
         method: 'POST',
@@ -29,52 +55,250 @@ async function postJson(url, body) {
     return json;
 }
 
-function renderSummary(summary, pricing) {
-    const usage = summary.usage;
-    const cache = summary.cache;
-    const cost = summary.cost;
-    const cacheWidth = Math.max(0, Math.min(100, cache.cacheHitRate));
-
-    return `
-        <div class="metrics">
-            <div class="metric"><strong>${usage.inputTokens}</strong><span>Input tokens</span></div>
-            <div class="metric"><strong>${cache.cachedInputTokens}</strong><span>Cached input</span></div>
-            <div class="metric"><strong class="money"><em>${cost.currencyCode}</em>${cost.total}</strong><span>Estimated cost</span></div>
-        </div>
-        <div class="cache-bar" aria-label="Cache hit rate ${formatPercent(cache.cacheHitRate)}">
-            <div class="cache-fill" style="width: ${cacheWidth}%"></div>
-        </div>
-        <p class="fine-print">Standard input: ${cache.standardInputTokens} tokens · Output: ${usage.outputTokens} tokens · Cache hit rate: ${formatPercent(cache.cacheHitRate)}</p>
-        <p class="fine-print">Cost: standard ${cost.currencyCode} ${cost.standardInput}, cached ${cost.currencyCode} ${cost.cachedInput}, output ${cost.currencyCode} ${cost.output}</p>
-        <p class="fine-print">Meters: ${escapeHtml(pricing.inputMeter)} · ${escapeHtml(pricing.cachedInputMeter)} · ${escapeHtml(pricing.outputMeter)}</p>
-    `;
-}
-
 function renderInstant(data) {
+    const pricing = data.pricing;
+    const cost = data.cost;
+    const usage = data.usage;
+    const cache = data.cache;
+    const currency = pricing.currencyCode || cost.currencyCode;
+
+    const totalCost = Number(cost.total) || 0;
+    const inputCost = (Number(cost.standardInput) || 0) + (Number(cost.cachedInput) || 0);
+    const outputCost = Number(cost.output) || 0;
+    const costBasis = inputCost + outputCost;
+    const inputPercent = costBasis > 0 ? (inputCost / costBasis) * 100 : 50;
+    const outputPercent = 100 - inputPercent;
+
+    const standardInputTokens = Number(cache.standardInputTokens) || 0;
+    const cachedInputTokens = Number(cache.cachedInputTokens) || 0;
+    const outputTokens = Number(usage.outputTokens) || 0;
+
     instantResult.className = 'result';
     instantResult.innerHTML = `
         <p class="answer">${escapeHtml(data.response)}</p>
-        ${renderSummary(data, data.pricing)}
+        <div class="price-headline">
+            <div class="price-figure">
+                <em>${escapeHtml(currency)}</em>
+                <strong>${formatMoney(totalCost, '').trim()}</strong>
+                <span>cost · this call</span>
+            </div>
+            <div class="price-meta">
+                <span class="price-live"><span class="live-dot"></span>Live Azure retail rates</span>
+                <span class="price-scale">${formatMoney(totalCost * 1000, currency)}<em>per 1,000 calls</em></span>
+                <span class="price-scale">${formatMoney(totalCost * 1000000, currency)}<em>per 1M calls</em></span>
+            </div>
+        </div>
+        <div class="cost-split" aria-label="Estimated cost split: input ${formatMoney(inputCost, currency)}, output ${formatMoney(outputCost, currency)}">
+            <div class="cost-track">
+                <div class="cost-seg cost-input" style="width: ${inputPercent}%"><span>Input ${formatMoney(inputCost, currency)}</span></div>
+                <div class="cost-seg cost-output" style="width: ${outputPercent}%"><span>Output ${formatMoney(outputCost, currency)}</span></div>
+            </div>
+            <div class="cost-legend">
+                <span class="legend-item"><span class="swatch in"></span>${formatInteger(usage.inputTokens)} input tokens</span>
+                <span class="legend-item"><span class="swatch out"></span>${formatInteger(outputTokens)} output tokens</span>
+            </div>
+        </div>
+        <div class="rate-source">
+            <span class="rate-source-title">Live from Azure Retail Prices API</span>
+            <span class="rate-source-detail">${escapeHtml(pricing.region)} · ${escapeHtml(pricing.scope)} scope · retrieved ${escapeHtml(formatClock(pricing.retrievedAt))}</span>
+        </div>
+        <div class="rate-cards">
+            ${renderRateCard('Input', pricing.inputRateValue, currency, pricing.unitOfMeasure, pricing.inputMeter, standardInputTokens, cost.standardInput)}
+            ${renderRateCard('Cached input', pricing.cachedInputRateValue, currency, pricing.unitOfMeasure, pricing.cachedInputMeter, cachedInputTokens, cost.cachedInput)}
+            ${renderRateCard('Output', pricing.outputRateValue, currency, pricing.unitOfMeasure, pricing.outputMeter, outputTokens, cost.output)}
+        </div>
+        <p class="fine-print">Usage: input ${formatInteger(usage.inputTokens)} · output ${formatInteger(outputTokens)} · total ${formatInteger(usage.totalTokens)} tokens. Meter prefix: ${escapeHtml(pricing.meterPrefix)}.</p>
+        <p class="fine-print">Per-call cost is tiny by design; the projections multiply this run's live-priced tokens so the real rates stay tangible at scale.</p>
+    `;
+}
+
+function renderRateCard(label, rateValue, currency, unit, meterName, tokens, callCost) {
+    const hasRate = rateValue !== null && rateValue !== undefined && rateValue !== ''
+        && meterName && meterName !== 'not found';
+    if (!hasRate) {
+        return `
+            <div class="rate-card rate-card-missing">
+                <span class="rate-label">${escapeHtml(label)}</span>
+                <strong class="rate-value">—</strong>
+                <span class="rate-meter">No live ${escapeHtml(label.toLowerCase())} meter</span>
+                <span class="rate-usage">${formatInteger(tokens)} tokens this call</span>
+            </div>
+        `;
+    }
+    const unitLabel = unit ? `/ ${escapeHtml(unit)} tokens` : '/ 1M tokens';
+    return `
+        <div class="rate-card">
+            <span class="rate-label">${escapeHtml(label)}</span>
+            <strong class="rate-value">${formatRate(rateValue, currency)}<em>${unitLabel}</em></strong>
+            <span class="rate-meter" title="${escapeHtml(meterName)}">${escapeHtml(meterName)}</span>
+            <span class="rate-usage">${formatInteger(tokens)} tokens &rarr; ${formatMoney(callCost, currency)}</span>
+        </div>
     `;
 }
 
 function renderCacheDemo(data) {
+    const calls = Array.isArray(data.calls) ? data.calls : [];
+    const warmUp = calls[0];
+    const repeated = calls[1] || calls[0];
+    const pricing = data.pricing || {};
+    const currency = pricing.currencyCode || (repeated && repeated.cost && repeated.cost.currencyCode) || 'USD';
+
+    const warmCache = repeated.cache || {};
+    const cachedTokens = Number(warmCache.cachedInputTokens) || 0;
+    const totalInput = Number(repeated.usage.inputTokens) || 0;
+    const freshTokens = Math.max(0, totalInput - cachedTokens);
+    const hitRate = Number(warmCache.cacheHitRate) || 0;
+    const fillPercent = Math.max(0, Math.min(100, hitRate));
+    const savings = Number(repeated.cost.cacheSavings) || 0;
+    const hot = cachedTokens > 0;
+
+    const answer = (repeated && repeated.response) || (warmUp && warmUp.response) || '';
+    const cachedRate = pricing.cachedInputRate || 'cached-input meter';
+
     cacheResult.className = 'result';
     cacheResult.innerHTML = `
-        <p class="fine-print">Cache key: ${escapeHtml(data.cacheKey)} · Prompt characters: ${data.promptCharacters}</p>
-        ${data.calls.map((run) => renderCacheRun(run, data.pricing)).join('')}
+        <div class="cache-headline ${hot ? '' : 'cache-headline-cold'}">
+            <div class="cache-figure">
+                <strong data-count-to="${fillPercent.toFixed(2)}" data-count-suffix="%">0%</strong>
+                <span>cache hit on reuse</span>
+            </div>
+            <div class="cache-headline-meta">
+                <span class="cache-live"><span class="live-dot warm"></span>${hot ? 'Cache warmed in real time' : 'Cache primed — no reuse yet'}</span>
+                <span class="cache-saved"><strong data-count-to="${cachedTokens}" data-count-int="1">0</strong> tokens served from cache</span>
+            </div>
+        </div>
+
+        <div class="cache-gauge" aria-label="Cache fill ${formatPercent(hitRate)}">
+            <div class="cache-gauge-head">
+                <span class="cache-gauge-title">Model cache · ${escapeHtml(data.model || pricing.model || '')}</span>
+                <span class="cache-gauge-state" data-state>Priming&hellip;</span>
+            </div>
+            <div class="cache-tank">
+                <div class="cache-tank-fill" data-fill style="width: 0%"></div>
+                <div class="cache-tank-label">
+                    <span class="tank-cached"><span data-count-to="${cachedTokens}" data-count-int="1">0</span> cached</span>
+                    <span class="tank-fresh">${formatInteger(freshTokens)} fresh</span>
+                </div>
+            </div>
+            <div class="cache-legend">
+                <span class="legend-item"><span class="swatch warm"></span>Cached prefix (warm)</span>
+                <span class="legend-item"><span class="swatch cold"></span>Fresh input (cold)</span>
+            </div>
+        </div>
+
+        <div class="cache-compare">
+            ${renderCacheCall(warmUp, 'cold', currency)}
+            <div class="cache-arrow"><span>reuses key</span></div>
+            ${renderCacheCall(repeated, 'warm', currency)}
+        </div>
+
+        ${answer ? `<div class="cache-answer"><span class="cache-answer-label">Model answer</span><p class="answer">${escapeHtml(answer)}</p></div>` : ''}
+
+        <div class="cache-loaded">
+            <div class="cache-loaded-head">
+                <span class="cache-loaded-title">What was loaded into cache</span>
+                <span class="cache-loaded-meta">${formatInteger(data.referenceSections)} stable sections &middot; ${formatInteger(data.promptCharacters)} characters</span>
+            </div>
+            <div class="cache-key-row">
+                <span class="cache-key-label">Cache key</span>
+                <code class="cache-key">${escapeHtml(data.cacheKey)}</code>
+            </div>
+            <div class="cache-preview">${escapeHtml(data.promptPreview)}</div>
+        </div>
+
+        <div class="cache-savings">
+            <span class="cache-savings-label">Saved by reuse</span>
+            <span class="cache-savings-value">${formatMoney(savings, currency)}<em>per repeated call</em></span>
+            <span class="cache-savings-value">${formatMoney(savings * 1000, currency)}<em>per 1,000 reuses</em></span>
+        </div>
+
+        <p class="fine-print">The warm-up call primes the cache for this key; the repeated call reuses the stable prefix. Cached input tokens are reported by the model API and billed at the cached-input meter (${escapeHtml(cachedRate)}).</p>
+    `;
+
+    animateCacheReveal(cacheResult, fillPercent);
+}
+
+function renderCacheCall(run, temp, currency) {
+    if (!run) {
+        return '';
+    }
+    const cache = run.cache || {};
+    const cached = Number(cache.cachedInputTokens) || 0;
+    const input = Number(run.usage.inputTokens) || 0;
+    const pct = input > 0 ? Math.max(0, Math.min(100, (cached / input) * 100)) : 0;
+    const isWarm = temp === 'warm';
+    const badge = isWarm ? 'WARM' : 'COLD';
+    const note = isWarm ? 'Reused the cached prefix' : 'Primed the cache';
+
+    return `
+        <section class="cache-call cache-call-${temp}">
+            <div class="cache-call-head">
+                <h3>${escapeHtml(run.label)}</h3>
+                <span class="temp-badge temp-${temp}">${badge}</span>
+            </div>
+            <div class="cache-call-bar"><div class="cache-call-fill" data-fill-to="${pct.toFixed(2)}" style="width: 0%"></div></div>
+            <div class="cache-call-metrics">
+                <div><strong>${formatInteger(input)}</strong><span>input</span></div>
+                <div><strong>${formatInteger(cached)}</strong><span>cached</span></div>
+                <div><strong>${formatMoney(run.cost.total, currency)}</strong><span>cost</span></div>
+            </div>
+            <p class="cache-call-note">${escapeHtml(note)}</p>
+        </section>
     `;
 }
 
-function renderCacheRun(run, pricing) {
-    return `
-        <section class="result-card">
-            <h3>${escapeHtml(run.label)}</h3>
-            <p class="answer">${escapeHtml(run.response)}</p>
-            ${renderSummary(run, pricing)}
-            <p class="fine-print">Cache savings versus uncached input: ${run.cost.currencyCode} ${run.cost.cacheSavings}</p>
-        </section>
-    `;
+// Sequenced reveal so the cache visibly "warms up" after the data lands:
+// a short priming beat, then the gauge fills and the token counters tick up.
+function animateCacheReveal(root, fillPercent) {
+    const fill = root.querySelector('[data-fill]');
+    const state = root.querySelector('[data-state]');
+    const callFills = Array.from(root.querySelectorAll('[data-fill-to]'));
+    const counters = Array.from(root.querySelectorAll('[data-count-to]'));
+    const duration = 1300;
+
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const settle = () => {
+        if (fill) fill.style.width = fillPercent + '%';
+        callFills.forEach((el) => { el.style.width = (Number(el.getAttribute('data-fill-to')) || 0) + '%'; });
+        if (state) {
+            state.textContent = fillPercent > 0 ? 'Cache warm' : 'Cache cold';
+            state.classList.toggle('warm', fillPercent > 0);
+        }
+        counters.forEach((el) => {
+            const target = Number(el.getAttribute('data-count-to')) || 0;
+            const isInt = el.getAttribute('data-count-int') === '1';
+            const suffix = el.getAttribute('data-count-suffix') || '';
+            el.textContent = (isInt ? formatInteger(Math.round(target)) : target.toFixed(2)) + suffix;
+        });
+    };
+
+    if (reduceMotion) {
+        settle();
+        return;
+    }
+
+    setTimeout(() => {
+        if (fill) fill.style.width = fillPercent + '%';
+        callFills.forEach((el) => { el.style.width = (Number(el.getAttribute('data-fill-to')) || 0) + '%'; });
+        if (state) {
+            state.textContent = fillPercent > 0 ? 'Cache warm' : 'Cache cold';
+            state.classList.toggle('warm', fillPercent > 0);
+        }
+        const start = performance.now();
+        const tick = (now) => {
+            const t = Math.min(1, (now - start) / duration);
+            const eased = 1 - Math.pow(1 - t, 3);
+            counters.forEach((el) => {
+                const target = Number(el.getAttribute('data-count-to')) || 0;
+                const isInt = el.getAttribute('data-count-int') === '1';
+                const suffix = el.getAttribute('data-count-suffix') || '';
+                const value = target * eased;
+                el.textContent = (isInt ? formatInteger(Math.round(value)) : value.toFixed(2)) + suffix;
+            });
+            if (t < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+    }, 320);
 }
 
 function renderCompaction(data) {

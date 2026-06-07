@@ -43,7 +43,7 @@ Sanitized validation finding: one West US 3 subscription checked during developm
 
 This Java sample calls an instant model from a Foundry project endpoint, prints token usage, and estimates cost per call with live pricing from the Azure Retail Prices API.
 
-The dashboard includes three examples: a small instant model call, a prompt cache comparison, and a compaction demo that turns long working notes into a shorter reusable summary.
+The dashboard includes three examples: an instant model call priced live against Azure Retail Prices meters, a prompt cache demo that warms the model cache in real time, and a compaction demo that turns long working notes into a shorter reusable summary.
 
 The sample follows the Microsoft Foundry Java quickstart pattern with `com.azure:azure-ai-agents:2.0.0` and uses Microsoft Entra authentication through `DefaultAzureCredential`. No API key or project-specific secret is stored in this repository.
 
@@ -53,6 +53,8 @@ The sample follows the Microsoft Foundry Java quickstart pattern with `com.azure
 - Uses an instant model by name, so no model deployment is required.
 - Loads local settings from `.env`, while keeping `.env` out of git.
 - Prints the model response plus input, output, total, and cached-input token usage.
+- Prices every instant call live, splits input versus output cost, and projects the cost to 1,000 and 1M calls.
+- Visualizes prompt cache warming in real time, comparing a cold warm-up call with a warm repeated call and showing the cached prefix that was loaded.
 - Compacts long working notes into a shorter reusable prompt and shows request-level token savings.
 - Looks up current prices at runtime from `https://prices.azure.com/api/retail/prices`.
 - Estimates per-call cost from the returned token usage and live retail pricing meters.
@@ -61,19 +63,19 @@ The sample follows the Microsoft Foundry Java quickstart pattern with `com.azure
 
 ![Instant Models Lab dashboard](article-assets/instant-models-dashboard.png)
 
-The dashboard presents the three token-efficiency workflows side by side: instant model calls, prompt cache reuse, and prompt compaction.
+The dashboard presents three token-efficiency workflows side by side: a live-priced instant model call, real-time prompt cache warming, and prompt compaction.
 
-![Instant Models Lab token efficiency results](article-assets/instant-models-results.png)
+![Instant model live pricing results](article-assets/instant-models-results.png)
 
-Representative result view showing input tokens, cached input tokens, estimated cost, and compaction savings. Live values vary by model, prompt, region, quota, and current retail pricing response.
+The instant demo prices a single call live against Azure Retail Prices meters. It leads with the per-call cost, projects it to 1,000 and 1M calls, splits input versus output cost, and lists the live input, cached-input, and output rates with their meter names. Live values vary by model, prompt, region, quota, and current retail pricing response.
 
-![Prompt cache demo results](article-assets/prompt-cache-results.png)
+![Prompt cache warming results](article-assets/prompt-cache-results.png)
 
-The prompt cache demo compares a warm-up call with a repeated call that reuses the stable prompt prefix and reports cached input tokens.
+The prompt cache demo warms the model cache in real time. A cold warm-up call primes a long stable prefix, then a warm repeated call reuses it: the animated gauge fills to the cache-hit rate, the cold-versus-warm cards compare cost, and the panel shows exactly what was loaded into cache plus the savings per reuse.
 
 ![Compaction demo results](article-assets/compaction-results.png)
 
-The compaction demo shows how long working notes can be turned into a shorter reusable summary, while still accounting for the cost of the compaction call itself.
+The compaction demo turns long working notes into a shorter reusable summary, showing tokens saved, reduction percentage, and the cost of the compaction call itself.
 
 ## Prerequisites
 
@@ -172,7 +174,7 @@ To run the Spring Boot web dashboard locally:
 mvn spring-boot:run
 ```
 
-Open `http://localhost:8080` and use the buttons to run the instant model demo, prompt cache demo, or compaction demo.
+Open `http://localhost:8080` and use the buttons to price a live instant call (**Run instant model & price it**), warm the prompt cache (**Warm the cache**), or compact working notes (**Compact prompt**).
 
 Use `mvn compile exec:java` after `mvn clean` or from a fresh clone. `mvn exec:java` by itself only works after classes already exist under `target/classes`.
 
@@ -186,7 +188,7 @@ mvn compile exec:java
 
 ## Prompt Cache Demo
 
-The default sample is intentionally small, so it usually has no cached input tokens. For demos, use the dedicated prompt-cache example. It sends the same long prompt twice with a stable `promptCacheKey`, then compares the warm-up call with the repeated call. This demo intentionally uses a much longer prompt than the default sample so the cache behavior is visible.
+The default sample is intentionally small, so it usually has no cached input tokens. For demos, use the dedicated prompt-cache example. It sends the same long prompt twice with a stable `promptCacheKey`, then compares the warm-up call with the repeated call. This demo intentionally uses a much longer prompt than the default sample so the cache behavior is visible. In the web dashboard, the **Warm the cache** button shows this as a real-time animation: an animated cache gauge fills to the hit rate, the cold warm-up and warm repeated calls are compared side by side, and the panel lists exactly what was loaded into cache.
 
 ```powershell
 mvn compile exec:java '-Dexec.mainClass=com.example.instantmodels.PromptCacheDemoApp'

@@ -18,6 +18,17 @@ import org.springframework.stereotype.Service;
 @Service
 class DemoRunService {
     private static final String CACHE_KEY_PREFIX = "im-web-cache";
+    private static final int REFERENCE_SECTION_COUNT = 120;
+    private static final String REFERENCE_INTRO = String.join(" ",
+            "You are evaluating a reusable internal reference document about instant models.",
+            "Use only the reference material below, then answer the final question briefly.");
+    private static final String REFERENCE_SECTION_TEXT = String.join(" ",
+            "Instant models let developers call supported models by name without creating deployments.",
+            "They are useful for prototyping, model comparison, early workflow testing, and cost exploration.",
+            "Applications should still consider deployments when they need reserved throughput, custom controls,",
+            "data residency choices, or production isolation.",
+            "Prompt caching is useful when a large stable prefix is reused across calls because cached input",
+            "tokens can be billed differently from standard input tokens.");
     private static final String DEFAULT_COMPACT_PROMPT = String.join("\n",
             "Goal: ship a small Java dashboard change that explains instant model throughput limits.",
             "Context gathered: Microsoft Foundry instant models are preview-scoped to West US 3 and can be called by model name without creating a deployment. They draw from a per-model global quota pool assigned to the subscription. The app should keep token usage, pricing, and cache behavior visible because this repository is a cost-transparency sample.",
@@ -66,6 +77,8 @@ class DemoRunService {
                 InstantModelsConfig.model(),
                 cacheKey,
                 prompt.length(),
+                REFERENCE_SECTION_COUNT,
+                cacheablePromptPreview(),
                 pricingSummary(pricing),
                 List.of(
                         summarize("Warm-up call", warmUp, pricing),
@@ -168,9 +181,14 @@ class DemoRunService {
                 pricing.region(),
                 InstantModelsConfig.pricingScope(),
                 pricing.retrievedAt().toString(),
+                pricing.currencyCode(),
+                pricing.inputMeter().unitOfMeasure(),
                 pricing.inputMeter().displayRate(),
                 pricing.cachedInputMeter().map(RetailPriceMeter::displayRate).orElse("not found"),
                 pricing.outputMeter().displayRate(),
+                pricing.inputMeter().pricePerMillionTokens().toPlainString(),
+                pricing.cachedInputMeter().map(meter -> meter.pricePerMillionTokens().toPlainString()).orElse(null),
+                pricing.outputMeter().pricePerMillionTokens().toPlainString(),
                 pricing.inputMeter().meterName(),
                 pricing.cachedInputMeter().map(RetailPriceMeter::meterName).orElse("not found"),
                 pricing.outputMeter().meterName());
@@ -183,23 +201,24 @@ class DemoRunService {
 
     private static String cacheablePrompt(String runId) {
         StringBuilder builder = new StringBuilder();
-        builder.append("You are evaluating a reusable internal reference document about instant models. ")
-                .append("Use only the reference material below, then answer the final question briefly.\n\n")
+        builder.append(REFERENCE_INTRO).append("\n\n")
                 .append("Demo run id: ").append(runId).append("\n\n")
                 .append("Reference material:\n");
 
-        for (int index = 1; index <= 120; index++) {
+        for (int index = 1; index <= REFERENCE_SECTION_COUNT; index++) {
             builder.append("Section ").append(index).append(": ")
-                    .append("Instant models let developers call supported models by name without creating deployments. ")
-                    .append("They are useful for prototyping, model comparison, early workflow testing, and cost exploration. ")
-                    .append("Applications should still consider deployments when they need reserved throughput, custom controls, ")
-                    .append("data residency choices, or production isolation. ")
-                    .append("Prompt caching is useful when a large stable prefix is reused across calls because cached input ")
-                    .append("tokens can be billed differently from standard input tokens.\n");
+                    .append(REFERENCE_SECTION_TEXT).append("\n");
         }
 
         builder.append("\nFinal question: In one sentence, why is prompt caching useful for this instant models demo?");
         return builder.toString();
+    }
+
+    private static String cacheablePromptPreview() {
+        return REFERENCE_INTRO + "\n\nReference material:\n"
+                + "Section 1: " + REFERENCE_SECTION_TEXT + "\n"
+                + "Section 2: " + REFERENCE_SECTION_TEXT + "\n"
+                + "\u2026 (" + (REFERENCE_SECTION_COUNT - 2) + " more identical stable sections reused on every call)";
     }
 
     private static String outputText(Response response) {
@@ -252,6 +271,8 @@ class DemoRunService {
             String model,
             String cacheKey,
             int promptCharacters,
+            int referenceSections,
+            String promptPreview,
             PricingSummary pricing,
             List<CallSummary> calls) {
     }
@@ -300,9 +321,14 @@ class DemoRunService {
             String region,
             String scope,
             String retrievedAt,
+            String currencyCode,
+            String unitOfMeasure,
             String inputRate,
             String cachedInputRate,
             String outputRate,
+            String inputRateValue,
+            String cachedInputRateValue,
+            String outputRateValue,
             String inputMeter,
             String cachedInputMeter,
             String outputMeter) {
