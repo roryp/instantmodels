@@ -98,6 +98,7 @@ function renderInstant(data) {
                 <span class="legend-item"><span class="swatch out"></span>${formatInteger(outputTokens)} output tokens</span>
             </div>
         </div>
+        ${renderInstantComparison(data, currency)}
         <div class="rate-source">
             <span class="rate-source-title">Live from Azure Retail Prices API</span>
             <span class="rate-source-detail">${escapeHtml(pricing.region)} · ${escapeHtml(pricing.scope)} scope · retrieved ${escapeHtml(formatClock(pricing.retrievedAt))}</span>
@@ -110,6 +111,49 @@ function renderInstant(data) {
         <p class="fine-print">Usage: input ${formatInteger(usage.inputTokens)} · output ${formatInteger(outputTokens)} · total ${formatInteger(usage.totalTokens)} tokens. Meter prefix: ${escapeHtml(pricing.meterPrefix)}.</p>
         <p class="fine-print">Per-call cost is tiny by design; the projections multiply this run's live-priced tokens so the real rates stay tangible at scale.</p>
     `;
+}
+
+function renderInstantComparison(data, currency) {
+    const comparisons = Array.isArray(data.comparisons) ? data.comparisons : [];
+    if (!comparisons.length) {
+        return '';
+    }
+    const pricing = data.pricing || {};
+    const instantTotal = Number(data.cost.total) || 0;
+    const topMultiplier = comparisons.reduce((max, item) => Math.max(max, Number(item.multiplier) || 0), 0);
+    const rows = [
+        comparisonRow('Instant model', 'No deployment · every Foundry project', pricing.inputRateValue, pricing.outputRateValue, currency, instantTotal, 1, true),
+        ...comparisons.map((item) => comparisonRow(item.label, item.note, item.inputRateValue, item.outputRateValue, currency, Number(item.callCost) || 0, Number(item.multiplier) || 0, false)),
+    ].join('');
+    const savingsLine = topMultiplier > 1
+        ? `Instant is up to <strong>${formatMultiplier(topMultiplier)} cheaper</strong> than a deployed alternative for the same tokens.`
+        : '';
+    return `
+        <div class="compare-block">
+            <div class="compare-head">
+                <span class="compare-title">Instant vs deployed pricing</span>
+                ${savingsLine ? `<span class="compare-note">${savingsLine}</span>` : ''}
+            </div>
+            <div class="compare-rows">${rows}</div>
+        </div>
+    `;
+}
+
+function comparisonRow(name, note, inputRate, outputRate, currency, callCost, multiplier, isInstant) {
+    const multLabel = isInstant ? 'baseline rate' : `${formatMultiplier(multiplier)} cost`;
+    return `
+        <div class="compare-row ${isInstant ? 'compare-row-instant' : ''}">
+            <span class="compare-name">${escapeHtml(name)}<em>${escapeHtml(note)}</em></span>
+            <span class="compare-rate">${formatRate(inputRate, currency)} in · ${formatRate(outputRate, currency)} out<em>per 1M tokens</em></span>
+            <span class="compare-cost">${formatMoney(callCost, currency)}<em>${multLabel}</em></span>
+        </div>
+    `;
+}
+
+function formatMultiplier(value) {
+    const amount = Number(value) || 0;
+    const decimals = amount % 1 === 0 ? 0 : 1;
+    return `${amount.toFixed(decimals)}&times;`;
 }
 
 function renderRateCard(label, rateValue, currency, unit, meterName, tokens, callCost) {

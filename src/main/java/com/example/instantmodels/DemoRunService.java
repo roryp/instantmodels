@@ -9,6 +9,7 @@ import com.openai.models.responses.ResponseUsage;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -54,6 +55,7 @@ class DemoRunService {
 
         ModelPricing pricing = pricing();
         CallSummary summary = summarize("Instant model call", response, pricing);
+        PricingEstimate estimate = pricing.estimateCost(usage(response));
         return new InstantDemoResult(
                 InstantModelsConfig.model(),
                 prompt,
@@ -61,7 +63,8 @@ class DemoRunService {
                 summary.usage(),
                 summary.cache(),
                 summary.cost(),
-                pricingSummary(pricing));
+                pricingSummary(pricing),
+                buildComparisons(pricing, estimate));
     }
 
     PromptCacheDemoResult runPromptCacheDemo() {
@@ -174,6 +177,31 @@ class DemoRunService {
                         formatCost(cacheSavings)));
     }
 
+    private List<InstantPriceComparison> buildComparisons(ModelPricing pricing, PricingEstimate estimate) {
+        BigDecimal instantTotal = estimate.totalCost();
+        List<InstantPriceComparison> comparisons = new ArrayList<>();
+        for (PricingBaseline baseline : pricing.comparisonBaselines()) {
+            BigDecimal baselineTotal = baseline.totalCostForTokens(
+                    estimate.standardInputTokens(), estimate.cachedInputTokens(), estimate.outputTokens());
+            BigDecimal multiplier = instantTotal.signum() == 0
+                    ? BigDecimal.ZERO
+                    : baselineTotal.divide(instantTotal, 2, RoundingMode.HALF_UP);
+            if (multiplier.compareTo(BigDecimal.ONE) <= 0) {
+                continue;
+            }
+            comparisons.add(new InstantPriceComparison(
+                    baseline.id(),
+                    baseline.label(),
+                    baseline.note(),
+                    baseline.inputMeter().pricePerMillionTokens().toPlainString(),
+                    baseline.cachedInputMeter().map(meter -> meter.pricePerMillionTokens().toPlainString()).orElse(null),
+                    baseline.outputMeter().pricePerMillionTokens().toPlainString(),
+                    formatCost(baselineTotal),
+                    multiplier.toPlainString()));
+        }
+        return comparisons;
+    }
+
     private PricingSummary pricingSummary(ModelPricing pricing) {
         return new PricingSummary(
                 pricing.selectedModel(),
@@ -264,7 +292,19 @@ class DemoRunService {
             UsageSummary usage,
             CacheSummary cache,
             CostSummary cost,
-            PricingSummary pricing) {
+            PricingSummary pricing,
+            List<InstantPriceComparison> comparisons) {
+    }
+
+    record InstantPriceComparison(
+            String id,
+            String label,
+            String note,
+            String inputRateValue,
+            String cachedInputRateValue,
+            String outputRateValue,
+            String callCost,
+            String multiplier) {
     }
 
     record PromptCacheDemoResult(

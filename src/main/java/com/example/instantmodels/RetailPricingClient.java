@@ -38,12 +38,40 @@ final class RetailPricingClient {
 
     ModelPricing getPricing(String selectedModel, String meterPrefix, String region, String currencyCode, String scope) {
         List<RetailPriceItem> items = fetchPricingItems(meterPrefix, region, currencyCode);
-        RetailPriceItem input = findRequiredMeter(items, meterPrefix, scope, "standard input", this::isStandardInputMeter);
-        RetailPriceItem output = findRequiredMeter(items, meterPrefix, scope, "output", this::isOutputMeter);
-        Optional<RetailPriceItem> cachedInput = findMeter(items, meterPrefix, scope, this::isCachedInputMeter);
+        RetailPriceItem input = findRequiredMeter(items, meterPrefix, scope, false, "standard input", this::isStandardInputMeter);
+        RetailPriceItem output = findRequiredMeter(items, meterPrefix, scope, false, "output", this::isOutputMeter);
+        Optional<RetailPriceItem> cachedInput = findMeter(items, meterPrefix, scope, false, this::isCachedInputMeter);
+
+        List<PricingBaseline> comparisonBaselines = buildComparisonBaselines(items, meterPrefix, scope, input);
 
         return new ModelPricing(selectedModel, meterPrefix, region, currencyCode,
-                toMeter(input), cachedInput.map(this::toMeter), toMeter(output), Instant.now());
+                toMeter(input), cachedInput.map(this::toMeter), toMeter(output), comparisonBaselines, Instant.now());
+    }
+
+    private List<PricingBaseline> buildComparisonBaselines(
+            List<RetailPriceItem> items, String meterPrefix, String instantScope, RetailPriceItem instantInput) {
+        List<PricingBaseline> baselines = new ArrayList<>();
+        addComparisonBaseline(baselines, items, meterPrefix, "dataZone", "Data Zone deployment",
+                "Same model pinned to a data-zone deployment", "Dz", false, instantInput);
+        addComparisonBaseline(baselines, items, meterPrefix, "priority", "Priority Processing",
+                "Premium priority-processing tier", instantScope, true, instantInput);
+        return baselines;
+    }
+
+    private void addComparisonBaseline(
+            List<PricingBaseline> baselines, List<RetailPriceItem> items, String meterPrefix,
+            String id, String label, String note, String scope, boolean includePremium, RetailPriceItem instantInput) {
+        Optional<RetailPriceItem> input = findMeter(items, meterPrefix, scope, includePremium, this::isStandardInputMeter);
+        Optional<RetailPriceItem> output = findMeter(items, meterPrefix, scope, includePremium, this::isOutputMeter);
+        if (input.isEmpty() || output.isEmpty()) {
+            return;
+        }
+        if (input.get().meterName().equals(instantInput.meterName())) {
+            return;
+        }
+        Optional<RetailPriceItem> cachedInput = findMeter(items, meterPrefix, scope, includePremium, this::isCachedInputMeter);
+        baselines.add(new PricingBaseline(id, label, note,
+                toMeter(input.get()), cachedInput.map(this::toMeter), toMeter(output.get())));
     }
 
     private List<RetailPriceItem> fetchPricingItems(String meterPrefix, String region, String currencyCode) {
@@ -93,9 +121,10 @@ final class RetailPricingClient {
             List<RetailPriceItem> items,
             String meterPrefix,
             String scope,
+            boolean includePremium,
             String meterKind,
             Predicate<String> meterNamePredicate) {
-        return findMeter(items, meterPrefix, scope, meterNamePredicate)
+        return findMeter(items, meterPrefix, scope, includePremium, meterNamePredicate)
                 .orElseThrow(() -> new IllegalStateException("No live Azure Retail Prices " + meterKind
                         + " meter found for prefix '" + meterPrefix + "' and scope '" + scope + "'."));
     }
@@ -104,6 +133,7 @@ final class RetailPricingClient {
             List<RetailPriceItem> items,
             String meterPrefix,
             String scope,
+            boolean includePremium,
             Predicate<String> meterNamePredicate) {
         return items.stream()
                 .filter(item -> item.unitPrice() != null)
@@ -111,7 +141,7 @@ final class RetailPricingClient {
                 .filter(item -> containsIgnoreCase(item.meterName(), meterPrefix))
                 .filter(item -> containsWord(item.meterName(), scope))
                 .filter(item -> !containsWord(item.meterName(), "Batch"))
-                .filter(item -> !containsWord(item.meterName(), "PP"))
+                .filter(item -> includePremium == containsWord(item.meterName(), "PP"))
                 .filter(item -> meterNamePredicate.test(item.meterName()))
                 .min(Comparator.comparing(RetailPriceItem::meterName));
     }

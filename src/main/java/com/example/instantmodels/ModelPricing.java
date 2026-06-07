@@ -5,6 +5,7 @@ import com.openai.models.responses.ResponseUsage;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 record ModelPricing(
@@ -15,6 +16,7 @@ record ModelPricing(
         RetailPriceMeter inputMeter,
         Optional<RetailPriceMeter> cachedInputMeter,
         RetailPriceMeter outputMeter,
+        List<PricingBaseline> comparisonBaselines,
         Instant retrievedAt) {
     PricingEstimate estimateCost(ResponseUsage usage) {
         long cachedInputTokens = Math.min(cachedInputTokens(usage), usage.inputTokens());
@@ -63,4 +65,23 @@ record PricingEstimate(
         BigDecimal outputCost,
         BigDecimal totalCost,
         String currencyCode) {
+}
+
+record PricingBaseline(
+        String id,
+        String label,
+        String note,
+        RetailPriceMeter inputMeter,
+        Optional<RetailPriceMeter> cachedInputMeter,
+        RetailPriceMeter outputMeter) {
+
+    BigDecimal totalCostForTokens(long standardInputTokens, long cachedInputTokens, long outputTokens) {
+        BigDecimal standardInputCost = inputMeter.costForTokens(standardInputTokens);
+        BigDecimal cachedInputCost = cachedInputMeter
+                .map(meter -> meter.costForTokens(cachedInputTokens))
+                .orElseGet(() -> inputMeter.costForTokens(cachedInputTokens));
+        BigDecimal outputCost = outputMeter.costForTokens(outputTokens);
+        return standardInputCost.add(cachedInputCost).add(outputCost)
+                .setScale(8, RoundingMode.HALF_UP);
+    }
 }

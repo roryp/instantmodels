@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Instant Models Lab</title>
-    <link rel="stylesheet" href="/styles.css?v=20260607-gh-v1">
+    <title>Token Efficiency</title>
+    <link rel="stylesheet" href="/styles.css?v=20260607-gh-v3">
 </head>
 <body>
     <main class="shell">
@@ -38,7 +38,7 @@
                     </div>
                     <span class="chip">1 call</span>
                 </div>
-                <p class="panel-copy">One instant model call, priced live against Azure Retail Prices meters. See the real input, cached, and output rates, then watch a fraction-of-a-cent call scale to 1,000 and 1M runs.</p>
+                <p class="panel-copy">An <strong>instant model</strong> is called by name &mdash; there's no deployment to create or manage, and it's available to every Foundry project automatically. It bills at standard pay-as-you-go rates, so it stays much cheaper than a data-zone or priority deployment. This call is priced live against Azure Retail Prices meters, then scaled to 1,000 and 1M runs.</p>
                 <label for="promptBox">Prompt</label>
                 <textarea id="promptBox" rows="5">In one sentence, why are instant models useful for prototyping?</textarea>
                 <button id="instantButton" class="action action-primary" type="button">Run instant model &amp; price it</button>
@@ -66,6 +66,7 @@
                     </div>
                     <span class="chip">1 call</span>
                 </div>
+                <p class="panel-copy">Long working notes pile up tokens on every turn. One call compacts them into a short, durable summary that keeps only the next-turn essentials &mdash; goal, key facts, and commands &mdash; so future prompts stay cheap. See the before&rarr;after token drop and reduction rate.</p>
                 <label for="compactPromptBox">Working notes</label>
                 <textarea id="compactPromptBox" rows="10">Goal: ship a small Java dashboard change that explains instant model throughput limits.
 Context gathered: Microsoft Foundry instant models are preview-scoped to West US 3 and can be called by model name without creating a deployment. They draw from a per-model global quota pool assigned to the subscription. The app should keep token usage, pricing, and cache behavior visible because this repository is a cost-transparency sample.
@@ -78,6 +79,6 @@ Open question: after the docs update, add a dashboard example that compacts long
             </article>
         </section>
     </main>
-    <script src="/app.js?v=20260607-gh-v1"></script>
+    <script src="/app.js?v=20260607-gh-v3"></script>
 </body>
 </html>

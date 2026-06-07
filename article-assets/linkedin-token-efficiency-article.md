@@ -6,7 +6,7 @@ Live demo: [http://aka.ms/costs](http://aka.ms/costs)
 
 Repo: [https://github.com/roryp/instantmodels](https://github.com/roryp/instantmodels)
 
-![Instant Models Lab dashboard](instant-models-dashboard.png){ width=6.5in }
+![Token Efficiency dashboard](instant-models-dashboard.png){ width=6.5in }
 
 *The dashboard starts with three focused workflows: a small instant model call, a prompt cache comparison, and a compaction demo.*
 

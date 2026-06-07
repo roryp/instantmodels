@@ -788,6 +788,72 @@ textarea {
     overflow-wrap: anywhere;
 }
 
+.compare-block {
+    margin: 0 0 14px;
+    padding: 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(31, 122, 255, 0.18);
+    background: rgba(31, 122, 255, 0.05);
+}
+
+.compare-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 12px;
+    margin-bottom: 10px;
+}
+
+.compare-title {
+    color: #1c5fc4;
+    font-size: 0.78rem;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.compare-note { color: #3d526c; font-size: 0.8rem; font-weight: 700; overflow-wrap: anywhere; }
+.compare-note strong { color: var(--green); font-weight: 900; }
+
+.compare-rows { display: flex; flex-direction: column; gap: 8px; }
+
+.compare-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.2fr) minmax(0, 0.8fr);
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid var(--line);
+}
+
+.compare-row-instant {
+    border-color: rgba(5, 132, 94, 0.4);
+    background: rgba(5, 132, 94, 0.07);
+    border-left: 4px solid var(--green);
+}
+
+.compare-name { min-width: 0; font-weight: 900; color: var(--ink); overflow-wrap: anywhere; }
+.compare-name em,
+.compare-rate em,
+.compare-cost em {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-style: normal;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.compare-rate { min-width: 0; color: #3d526c; font-size: 0.86rem; font-weight: 800; overflow-wrap: anywhere; }
+
+.compare-cost { min-width: 0; text-align: right; font-size: 1rem; font-weight: 900; color: var(--ink); overflow-wrap: anywhere; }
+.compare-row-instant .compare-cost { color: var(--green); }
+.compare-row:not(.compare-row-instant) .compare-cost em { color: var(--rose); }
+
 .compaction-headline {
     display: flex;
     align-items: center;
@@ -963,6 +1029,8 @@ textarea {
 @media (max-width: 560px) {
     .metrics { grid-template-columns: 1fr; }
     .rate-cards { grid-template-columns: 1fr; }
+    .compare-row { grid-template-columns: 1fr; gap: 4px; }
+    .compare-cost { text-align: left; }
     .price-meta,
     .cache-headline-meta {
         flex-basis: 100%;

@@ -18,6 +18,7 @@ Live app: [http://aka.ms/costs](http://aka.ms/costs)
 - [Example Output](#example-output)
 - [Cost Calculation](#cost-calculation)
     - [`gpt-chat-latest` vs `gpt-5.5` Pricing](#gpt-chat-latest-vs-gpt-55-pricing)
+    - [Instant versus deployed pricing](#instant-versus-deployed-pricing)
 - [Project Layout](#project-layout)
 
 ## Introduction
@@ -43,7 +44,7 @@ Sanitized validation finding: one West US 3 subscription checked during developm
 
 This Java sample calls an instant model from a Foundry project endpoint, prints token usage, and estimates cost per call with live pricing from the Azure Retail Prices API.
 
-The dashboard includes three examples: an instant model call priced live against Azure Retail Prices meters, a prompt cache demo that warms the model cache in real time, and a compaction demo that turns long working notes into a shorter reusable summary.
+The dashboard includes three examples: an instant model call priced live against Azure Retail Prices meters with an instant-versus-deployed price comparison, a prompt cache demo that warms the model cache in real time, and a compaction demo that turns long working notes into a shorter reusable summary.
 
 The sample follows the Microsoft Foundry Java quickstart pattern with `com.azure:azure-ai-agents:2.0.0` and uses Microsoft Entra authentication through `DefaultAzureCredential`. No API key or project-specific secret is stored in this repository.
 
@@ -54,6 +55,7 @@ The sample follows the Microsoft Foundry Java quickstart pattern with `com.azure
 - Loads local settings from `.env`, while keeping `.env` out of git.
 - Prints the model response plus input, output, total, and cached-input token usage.
 - Prices every instant call live, splits input versus output cost, and projects the cost to 1,000 and 1M calls.
+- Compares the instant (standard pay-as-you-go) per-call price against the same model's data-zone and priority-processing meters, all pulled live from the Azure Retail Prices API.
 - Visualizes prompt cache warming in real time, comparing a cold warm-up call with a warm repeated call and showing the cached prefix that was loaded.
 - Compacts long working notes into a shorter reusable prompt and shows request-level token savings.
 - Looks up current prices at runtime from `https://prices.azure.com/api/retail/prices`.
@@ -61,13 +63,13 @@ The sample follows the Microsoft Foundry Java quickstart pattern with `com.azure
 
 ## Screenshots
 
-![Instant Models Lab dashboard](article-assets/instant-models-dashboard.png)
+![Token Efficiency dashboard](article-assets/instant-models-dashboard.png)
 
 The dashboard presents three token-efficiency workflows side by side: a live-priced instant model call, real-time prompt cache warming, and prompt compaction.
 
 ![Instant model live pricing results](article-assets/instant-models-results.png)
 
-The instant demo prices a single call live against Azure Retail Prices meters. It leads with the per-call cost, projects it to 1,000 and 1M calls, splits input versus output cost, and lists the live input, cached-input, and output rates with their meter names. Live values vary by model, prompt, region, quota, and current retail pricing response.
+The instant demo opens with a short explainer: an instant model is called by name, needs no deployment to create or manage, is available to every Foundry project, and bills at standard pay-as-you-go rates. It then prices a single call live against Azure Retail Prices meters, leading with the per-call cost, projecting it to 1,000 and 1M calls, and splitting input versus output cost. An instant-versus-deployed comparison prices the same tokens against the data-zone and priority-processing meters so you can see how much cheaper the standard instant path is. Live values vary by model, prompt, region, quota, and current retail pricing response.
 
 ![Prompt cache warming results](article-assets/prompt-cache-results.png)
 
@@ -276,6 +278,18 @@ Current `westus3` global retail meters:
 | `5.5 LongCo` | USD 10 / 1M | USD 1 / 1M | USD 45 / 1M |
 
 So the important distinction is the billing family: `ShortCo` is the lower-cost path, and `LongCo` costs more. In this app, the observed `gpt-5.5` call also resolves to `5.5 ShortCo`, so it has the same per-token rates as `gpt-chat-latest` for the tested configuration.
+
+### Instant versus deployed pricing
+
+An instant model is called by name and bills at the standard pay-as-you-go (Global Standard) rate. The instant demo also prices the same call's tokens against the model's data-zone and priority-processing meters so the savings are concrete. All three rows come from the same live Azure Retail Prices response, so nothing is hardcoded.
+
+| Tier (`5.5 ShortCo`, `westus3`) | Input | Cached input | Output | Relative |
+| --- | ---: | ---: | ---: | ---: |
+| Standard / Global (instant) | USD 5 / 1M | USD 0.50 / 1M | USD 30 / 1M | baseline |
+| Data Zone Standard | USD 5.50 / 1M | USD 0.55 / 1M | USD 33 / 1M | ~1.1x |
+| Priority Processing | USD 12.50 / 1M | USD 1.25 / 1M | USD 75 / 1M | ~2.5x |
+
+An instant model and a Global Standard deployment of the same model bill at the same per-token rate, so the savings shown are versus the data-zone and priority-processing tiers, not versus every deployment. These values are point-in-time examples and vary by model, region, currency, and the current retail catalog.
 
 ## Project Layout
 
