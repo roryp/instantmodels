@@ -50,6 +50,46 @@ body {
     text-transform: uppercase;
 }
 
+.intro-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.intro-top .eyebrow { margin: 0; }
+
+.github-link {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.84);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    color: var(--ink);
+    font-size: 0.82rem;
+    font-weight: 900;
+    text-decoration: none;
+    transition: transform 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.github-link:hover {
+    transform: translateY(-1px);
+    color: var(--blue);
+    border-color: var(--blue);
+}
+
+.github-link:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+}
+
+.github-link svg { display: block; }
+
 h1, h2 { margin: 0; letter-spacing: 0; }
 h1 { font-size: clamp(2.5rem, 7vw, 5.4rem); line-height: 0.94; }
 h2 { font-size: 1.45rem; }
