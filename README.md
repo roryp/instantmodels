@@ -2,6 +2,8 @@
 
 Live app: [http://aka.ms/costs](http://aka.ms/costs)
 
+This Java 21 / Spring Boot sample for Microsoft Foundry instant models demonstrates token-efficient Responses API calls with live cost transparency—surfacing input, output, and cached tokens alongside estimated cost from real Azure Retail Prices meters—across three demos in both a CLI and a web dashboard: an Instant Demo that prices a single live model-by-name call, a Prompt Cache Demo that warms a long stable prefix and compares the cold→warm token savings on a repeated call, and a Compaction Demo that condenses long working notes into a short durable summary to show the before→after token reduction. Everything authenticates via Microsoft Entra (DefaultAzureCredential) and deploys to Azure Container Apps with azd.
+
 ## Contents
 
 - [Introduction](#introduction)
