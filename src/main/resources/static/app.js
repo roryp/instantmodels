@@ -37,6 +37,30 @@ const formatRate = (value, currencyCode) => {
     return `${currencyCode} ${amount.toFixed(decimals)}`;
 };
 
+// Compact unit price for a single token type, e.g. "USD 30 / 1M". Color, not
+// this label, carries the "how expensive" signal; the number keeps it literal.
+const formatPerMillion = (ratePerMillion, currencyCode) => {
+    const amount = Number(ratePerMillion) || 0;
+    let decimals = 2;
+    if (amount > 0 && amount < 0.1) {
+        decimals = 3;
+    } else if (amount % 1 === 0) {
+        decimals = 0;
+    }
+    return `${currencyCode} ${amount.toFixed(decimals)} / 1M`;
+};
+
+// One segment of the dual count/cost bar. Width is the share; the tier class
+// (cheap | mid | hot) maps the token type to its price-intensity color so the
+// same token reads identically in the count bar and the cost bar.
+const tokenSegment = (tier, label, widthPercent) => {
+    const width = Math.max(0, Number(widthPercent) || 0);
+    if (width <= 0) {
+        return '';
+    }
+    return `<div class="tok-seg tok-${tier}" style="width: ${width}%" data-label="${escapeHtml(label)}"><span>${label}</span></div>`;
+};
+
 const formatClock = (iso) => {
     const when = new Date(iso);
     return Number.isNaN(when.getTime()) ? String(iso ?? '') : when.toLocaleTimeString();
@@ -63,15 +87,31 @@ function renderInstant(data) {
     const currency = pricing.currencyCode || cost.currencyCode;
 
     const totalCost = Number(cost.total) || 0;
-    const inputCost = (Number(cost.standardInput) || 0) + (Number(cost.cachedInput) || 0);
+    const standardInputCost = Number(cost.standardInput) || 0;
+    const cachedInputCost = Number(cost.cachedInput) || 0;
+    const inputCost = standardInputCost + cachedInputCost;
     const outputCost = Number(cost.output) || 0;
-    const costBasis = inputCost + outputCost;
-    const inputPercent = costBasis > 0 ? (inputCost / costBasis) * 100 : 50;
-    const outputPercent = 100 - inputPercent;
+    const costBasis = standardInputCost + cachedInputCost + outputCost;
 
     const standardInputTokens = Number(cache.standardInputTokens) || 0;
     const cachedInputTokens = Number(cache.cachedInputTokens) || 0;
     const outputTokens = Number(usage.outputTokens) || 0;
+    const tokenBasis = standardInputTokens + cachedInputTokens + outputTokens;
+
+    // Two aligned bars share the same heat colors: the top bar weights each
+    // token type by COUNT, the bottom by COST. Output is the hot color, so its
+    // thin count slice but fat cost slice makes "60x pricier per token" visible.
+    const pct = (part, whole) => (whole > 0 ? (Number(part) / whole) * 100 : 0);
+    const countBar = [
+        tokenSegment('cheap', `${formatInteger(cachedInputTokens)} cached`, pct(cachedInputTokens, tokenBasis)),
+        tokenSegment('mid', `${formatInteger(standardInputTokens)} input`, pct(standardInputTokens, tokenBasis)),
+        tokenSegment('hot', `${formatInteger(outputTokens)} output`, pct(outputTokens, tokenBasis)),
+    ].join('');
+    const costBar = [
+        tokenSegment('cheap', formatMoney(cachedInputCost, currency), pct(cachedInputCost, costBasis)),
+        tokenSegment('mid', formatMoney(standardInputCost, currency), pct(standardInputCost, costBasis)),
+        tokenSegment('hot', formatMoney(outputCost, currency), pct(outputCost, costBasis)),
+    ].join('');
 
     instantResult.className = 'result';
     instantResult.innerHTML = `
@@ -88,29 +128,56 @@ function renderInstant(data) {
                 <span class="price-scale">${formatMoney(totalCost * 1000000, currency)}<em>per 1M calls</em></span>
             </div>
         </div>
-        <div class="cost-split" aria-label="Estimated cost split: input ${formatMoney(inputCost, currency)}, output ${formatMoney(outputCost, currency)}">
-            <div class="cost-track">
-                <div class="cost-seg cost-input" style="width: ${inputPercent}%"><span>Input ${formatMoney(inputCost, currency)}</span></div>
-                <div class="cost-seg cost-output" style="width: ${outputPercent}%"><span>Output ${formatMoney(outputCost, currency)}</span></div>
+        <div class="tok-bars" aria-label="Token mix versus cost mix. Cheaper token types are cooler in color; output tokens are the most expensive per token. Input cost ${formatMoney(inputCost, currency)}, output cost ${formatMoney(outputCost, currency)}.">
+            <div class="tok-row">
+                <span class="tok-row-label">By token count</span>
+                <div class="tok-track">${countBar}</div>
             </div>
-            <div class="cost-legend">
-                <span class="legend-item"><span class="swatch in"></span>${formatInteger(usage.inputTokens)} input tokens</span>
-                <span class="legend-item"><span class="swatch out"></span>${formatInteger(outputTokens)} output tokens</span>
+            <div class="tok-row">
+                <span class="tok-row-label">By cost</span>
+                <div class="tok-track">${costBar}</div>
+            </div>
+            <div class="tok-legend">
+                <span class="legend-item"><span class="swatch tok-cheap"></span>Cached input <strong class="legend-cost">${formatMoney(cachedInputCost, currency)}</strong></span>
+                <span class="legend-item"><span class="swatch tok-mid"></span>Standard input <strong class="legend-cost">${formatMoney(standardInputCost, currency)}</strong></span>
+                <span class="legend-item"><span class="swatch tok-hot"></span>Output <strong class="legend-cost">${formatMoney(outputCost, currency)}</strong></span>
+                <span class="tok-scale-note">Cooler = cheaper per token; warmer = pricier.</span>
             </div>
         </div>
-        ${renderInstantComparison(data, currency)}
         <div class="rate-source">
             <span class="rate-source-title">Live from Azure Retail Prices API</span>
             <span class="rate-source-detail">${escapeHtml(pricing.region)} · ${escapeHtml(pricing.scope)} scope · retrieved ${escapeHtml(formatClock(pricing.retrievedAt))}</span>
         </div>
         <div class="rate-cards">
-            ${renderRateCard('Input', pricing.inputRateValue, currency, pricing.unitOfMeasure, pricing.inputMeter, standardInputTokens, cost.standardInput)}
-            ${renderRateCard('Cached input', pricing.cachedInputRateValue, currency, pricing.unitOfMeasure, pricing.cachedInputMeter, cachedInputTokens, cost.cachedInput)}
-            ${renderRateCard('Output', pricing.outputRateValue, currency, pricing.unitOfMeasure, pricing.outputMeter, outputTokens, cost.output)}
+            ${renderRateCard('cheap', 'Cached input', pricing.cachedInputRateValue, currency, pricing.unitOfMeasure, pricing.cachedInputMeter, cachedInputTokens, cost.cachedInput)}
+            ${renderRateCard('mid', 'Input', pricing.inputRateValue, currency, pricing.unitOfMeasure, pricing.inputMeter, standardInputTokens, cost.standardInput)}
+            ${renderRateCard('hot', 'Output', pricing.outputRateValue, currency, pricing.unitOfMeasure, pricing.outputMeter, outputTokens, cost.output)}
         </div>
         <p class="fine-print">Usage: input ${formatInteger(usage.inputTokens)} · output ${formatInteger(outputTokens)} · total ${formatInteger(usage.totalTokens)} tokens. Meter prefix: ${escapeHtml(pricing.meterPrefix)}.</p>
         <p class="fine-print">Per-call cost is tiny by design; the projections multiply this run's live-priced tokens so the real rates stay tangible at scale.</p>
+        ${renderInstantComparison(data, currency)}
     `;
+
+    fitTokenSegments(instantResult);
+}
+
+// After layout, any segment whose label would clip mid-word hides its inline
+// text and exposes the full value on hover via a title tooltip, so a too-narrow
+// slice reads cleanly instead of showing a truncated "U.".
+function fitTokenSegments(root) {
+    root.querySelectorAll('.tok-seg').forEach((seg) => {
+        const span = seg.querySelector('span');
+        if (!span) {
+            return;
+        }
+        const tight = span.scrollWidth > span.clientWidth + 1;
+        seg.classList.toggle('tok-seg-tight', tight);
+        if (tight) {
+            seg.title = seg.dataset.label || span.textContent;
+        } else {
+            seg.removeAttribute('title');
+        }
+    });
 }
 
 function renderInstantComparison(data, currency) {
@@ -156,12 +223,12 @@ function formatMultiplier(value) {
     return `${amount.toFixed(decimals)}&times;`;
 }
 
-function renderRateCard(label, rateValue, currency, unit, meterName, tokens, callCost) {
+function renderRateCard(tier, label, rateValue, currency, unit, meterName, tokens, callCost) {
     const hasRate = rateValue !== null && rateValue !== undefined && rateValue !== ''
         && meterName && meterName !== 'not found';
     if (!hasRate) {
         return `
-            <div class="rate-card rate-card-missing">
+            <div class="rate-card rate-card-missing rate-${tier}">
                 <span class="rate-label">${escapeHtml(label)}</span>
                 <strong class="rate-value">—</strong>
                 <span class="rate-meter">No live ${escapeHtml(label.toLowerCase())} meter</span>
@@ -171,8 +238,8 @@ function renderRateCard(label, rateValue, currency, unit, meterName, tokens, cal
     }
     const unitLabel = unit ? `/ ${escapeHtml(unit)} tokens` : '/ 1M tokens';
     return `
-        <div class="rate-card">
-            <span class="rate-label">${escapeHtml(label)}</span>
+        <div class="rate-card rate-${tier}">
+            <span class="rate-label">${escapeHtml(label)}<span class="rate-chip rate-chip-${tier}">${formatPerMillion(rateValue, currency)}</span></span>
             <strong class="rate-value">${formatRate(rateValue, currency)}<em>${unitLabel}</em></strong>
             <span class="rate-meter" title="${escapeHtml(meterName)}">${escapeHtml(meterName)}</span>
             <span class="rate-usage">${formatInteger(tokens)} tokens &rarr; ${formatMoney(callCost, currency)}</span>

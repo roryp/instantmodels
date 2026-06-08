@@ -58,7 +58,8 @@ This Java sample calls an instant model from a Foundry project endpoint, prints 
 - Uses an instant model by name, so no model deployment is required.
 - Loads local settings from `.env`, while keeping `.env` out of git.
 - Prints the model response plus input, output, total, and cached-input token usage.
-- Prices every instant call live, splits input versus output cost, and projects the cost to 1,000 and 1M calls.
+- Prices every instant call live, color-codes the three token types by price-intensity (cooler = cheaper per token, warmer = pricier), and projects the cost to 1,000 and 1M calls.
+- Shows token mix versus cost mix as two aligned bars, so the small but expensive output share is obvious at a glance.
 - Compares the instant (standard pay-as-you-go) per-call price against the same model's data-zone and priority-processing meters, all pulled live from the Azure Retail Prices API.
 - Visualizes prompt cache warming in real time, comparing a cold warm-up call with a warm repeated call and showing the cached prefix that was loaded.
 - Compacts long working notes into a shorter reusable prompt and shows request-level token savings.
@@ -73,7 +74,7 @@ The dashboard presents three token-efficiency workflows side by side: a live-pri
 
 ![Instant model live pricing results](article-assets/instant-models-results.png)
 
-The instant demo opens with a short explainer: an instant model is called by name, needs no deployment to create or manage, is available to every Foundry project, and bills at standard pay-as-you-go rates. It then prices a single call live against Azure Retail Prices meters, leading with the per-call cost, projecting it to 1,000 and 1M calls, and splitting input versus output cost. An instant-versus-deployed comparison prices the same tokens against the data-zone and priority-processing meters so you can see how much cheaper the standard instant path is. Live values vary by model, prompt, region, quota, and current retail pricing response.
+The instant demo opens with a short explainer: an instant model is called by name, needs no deployment to create or manage, is available to every Foundry project, and bills at standard pay-as-you-go rates. It then prices a single call live against Azure Retail Prices meters, leading with the per-call cost and projecting it to 1,000 and 1M calls. The three token types—cached input, standard input, and output—are color-coded on a price-intensity scale (cooler is cheaper per token, warmer is more expensive), and two aligned bars compare token *count* against token *cost* so the small-but-expensive output share stands out. Each rate card carries a colored unit-price chip (for example output at roughly 60× the cached-input rate per token). An instant-versus-deployed comparison prices the same tokens against the data-zone and priority-processing meters so you can see how much cheaper the standard instant path is. Live values vary by model, prompt, region, quota, and current retail pricing response.
 
 ![Prompt cache warming results](article-assets/prompt-cache-results.png)
 
@@ -303,7 +304,7 @@ An instant model is called by name and bills at the standard pay-as-you-go (Glob
 | Tier (`5.5 ShortCo`, `westus3`) | Input | Cached input | Output | Relative |
 | --- | ---: | ---: | ---: | ---: |
 | Standard / Global (instant) | USD 5 / 1M | USD 0.50 / 1M | USD 30 / 1M | baseline |
-| Data Zone Standard | USD 5.50 / 1M | USD 0.55 / 1M | USD 33 / 1M | ~1.1x |
+| Data Zone deployment | USD 5.50 / 1M | USD 0.55 / 1M | USD 33 / 1M | ~1.1x |
 | Priority Processing | USD 12.50 / 1M | USD 1.25 / 1M | USD 75 / 1M | ~2.5x |
 
 An instant model and a Global Standard deployment of the same model bill at the same per-token rate, so the savings shown are versus the data-zone and priority-processing tiers, not versus every deployment. These values are point-in-time examples and vary by model, region, currency, and the current retail catalog.
@@ -313,22 +314,32 @@ An instant model and a Global Standard deployment of the same model bill at the 
 ```text
 .
 |-- .env.example
-|-- .gitignore
+|-- AGENTS.md                       # Guidance for coding agents
+|-- Dockerfile                      # Spring Boot container build (local build, no ACR remote build)
+|-- azure.yaml                      # azd service definition (web -> Container App)
 |-- pom.xml
 |-- README.md
+|-- article-assets/                 # README screenshots + Playwright capture script
+|-- infra/                          # Bicep: Foundry, ACR, Container Apps, managed identity, RBAC
+|   |-- container-app.bicep
+|   |-- foundry.bicep
+|   |-- main.bicep
+|   `-- main.parameters.json
 `-- src
     |-- main
     |   |-- java/com/example/instantmodels
-    |   |   |-- DemoController.java
-    |   |   |-- DemoRunService.java
-    |   |   |-- InstantModelsApp.java
-    |   |   |-- InstantModelsConfig.java
-    |   |   |-- InstantModelsWebApplication.java
+    |   |   |-- DemoController.java              # Web endpoints for the three demos
+    |   |   |-- DemoRunService.java              # Shared demo + pricing logic
+    |   |   |-- InstantModelsApp.java            # CLI entry point
+    |   |   |-- InstantModelsConfig.java         # Env / .env configuration
+    |   |   |-- InstantModelsWebApplication.java # Spring Boot web entry point
     |   |   |-- ModelPricing.java
-    |   |   |-- PromptCacheDemoApp.java
-    |   |   `-- RetailPricingClient.java
-    |   |-- resources/application.properties
-    |   `-- resources/static
+    |   |   |-- PromptCacheDemoApp.java          # CLI prompt-cache demo
+    |   |   `-- RetailPricingClient.java         # Live Azure Retail Prices lookup
+    |   `-- resources
+    |       |-- application.properties
+    |       |-- simplelogger.properties
+    |       `-- static                           # Web dashboard: index.html, app.js, styles.css
     `-- test/java/com/example/instantmodels
         |-- DemoRunServiceTest.java
         `-- InstantModelsConfigTest.java

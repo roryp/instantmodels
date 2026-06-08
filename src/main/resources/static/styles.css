@@ -12,6 +12,14 @@
     --green: #05845e;
     --rose: #d14d72;
     --violet: #6754d9;
+    /* Price-intensity scale: a token type's color encodes its $/token rate, so
+       cheap reads cool and expensive reads hot, independent of token count. */
+    --tok-cheap: #0e9aa7;
+    --tok-cheap-soft: #d6f3f5;
+    --tok-mid: #e08a1e;
+    --tok-mid-soft: #fcecd2;
+    --tok-hot: #d8456b;
+    --tok-hot-soft: #fbdde6;
     --shadow: 0 24px 70px rgba(26, 38, 58, 0.16);
 }
 
@@ -657,18 +665,34 @@ textarea {
     text-transform: uppercase;
 }
 
-.cost-split { margin: 0 0 14px; }
+.tok-bars { margin: 0 0 14px; }
 
-.cost-track {
+.tok-row {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.tok-row-label {
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.tok-track {
     display: flex;
-    height: 30px;
+    height: 28px;
     overflow: hidden;
     border-radius: 8px;
     border: 1px solid #d3dde9;
     background: #e8eef5;
 }
 
-.cost-seg {
+.tok-seg {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -677,22 +701,45 @@ textarea {
     font-size: 0.74rem;
     font-weight: 900;
     white-space: nowrap;
+    transition: width 0.5s ease;
 }
 
-.cost-seg span { padding: 0 6px; overflow: hidden; text-overflow: ellipsis; }
-.cost-input { background: linear-gradient(90deg, var(--blue), #5aa0ff); }
-.cost-output { background: linear-gradient(90deg, #23c18a, var(--green)); }
+.tok-seg span { padding: 0 6px; overflow: hidden; text-overflow: ellipsis; }
 
-.cost-legend {
+/* Too narrow for its label: drop the clipped text, reveal it on hover instead. */
+.tok-seg-tight { cursor: help; }
+.tok-seg-tight span { display: none; }
+
+.tok-cheap { background: linear-gradient(90deg, var(--tok-cheap), #38bcc7); }
+.tok-mid { background: linear-gradient(90deg, var(--tok-mid), #f2a945); }
+.tok-hot { background: linear-gradient(90deg, var(--tok-hot), #ef6388); }
+
+.tok-legend {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 6px 16px;
-    margin-top: 8px;
+    margin-top: 10px;
 }
 
-.cost-legend .swatch { width: 12px; height: 12px; border-radius: 3px; }
-.cost-legend .swatch.in { background: var(--blue); }
-.cost-legend .swatch.out { background: var(--green); }
+.tok-legend .swatch { width: 12px; height: 12px; border-radius: 3px; }
+.tok-legend .swatch.tok-cheap { background: var(--tok-cheap); }
+.tok-legend .swatch.tok-mid { background: var(--tok-mid); }
+.tok-legend .swatch.tok-hot { background: var(--tok-hot); }
+
+.legend-cost {
+    margin-left: 4px;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    font-weight: 900;
+}
+
+.tok-scale-note {
+    color: var(--muted);
+    font-size: 0.74rem;
+    font-style: italic;
+    font-weight: 700;
+}
 
 .rate-source {
     display: flex;
@@ -741,15 +788,38 @@ textarea {
     border-top: 4px solid var(--blue);
 }
 
+.rate-card.rate-cheap { border-top-color: var(--tok-cheap); }
+.rate-card.rate-mid { border-top-color: var(--tok-mid); }
+.rate-card.rate-hot { border-top-color: var(--tok-hot); }
+
 .rate-card-missing { border-top-color: #c2cedd; opacity: 0.78; }
 
 .rate-label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
     color: var(--muted);
     font-size: 0.72rem;
     font-weight: 900;
     letter-spacing: 0.02em;
     text-transform: uppercase;
 }
+
+.rate-chip {
+    padding: 2px 7px;
+    border-radius: 999px;
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 900;
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+}
+
+.rate-chip-cheap { background: var(--tok-cheap); }
+.rate-chip-mid { background: var(--tok-mid); }
+.rate-chip-hot { background: var(--tok-hot); }
 
 .rate-value {
     color: var(--ink);
@@ -782,11 +852,15 @@ textarea {
     margin-top: 2px;
     padding-top: 7px;
     border-top: 1px dashed var(--line);
-    color: var(--blue);
+    color: var(--ink);
     font-size: 0.76rem;
     font-weight: 900;
     overflow-wrap: anywhere;
 }
+
+.rate-cheap .rate-usage { color: var(--tok-cheap); }
+.rate-mid .rate-usage { color: var(--tok-mid); }
+.rate-hot .rate-usage { color: var(--tok-hot); }
 
 .compare-block {
     margin: 0 0 14px;
@@ -1029,6 +1103,7 @@ textarea {
 @media (max-width: 560px) {
     .metrics { grid-template-columns: 1fr; }
     .rate-cards { grid-template-columns: 1fr; }
+    .tok-row { grid-template-columns: 1fr; gap: 4px; }
     .compare-row { grid-template-columns: 1fr; gap: 4px; }
     .compare-cost { text-align: left; }
     .price-meta,
