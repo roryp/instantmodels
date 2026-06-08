@@ -1,13 +1,21 @@
 # Token Efficiency Samples
 
-Live app: [http://aka.ms/costs](http://aka.ms/costs)
+> A Java 21 / Spring Boot sample for Microsoft Foundry **instant models** that makes token cost visible on every call.
 
-This Java 21 / Spring Boot sample for Microsoft Foundry instant models demonstrates token-efficient Responses API calls with live cost transparency—surfacing input, output, and cached tokens alongside estimated cost from real Azure Retail Prices meters—across three demos in both a CLI and a web dashboard: an Instant Demo that prices a single live model-by-name call, a Prompt Cache Demo that warms a long stable prefix and compares the cold→warm token savings on a repeated call, and a Compaction Demo that condenses long working notes into a short durable summary to show the before→after token reduction. Everything authenticates via Microsoft Entra (DefaultAzureCredential) and deploys to Azure Container Apps with azd.
+**Live app:** [http://aka.ms/costs](http://aka.ms/costs)
+
+Call supported models by name—no deployment required—and see input, output, and cached tokens priced live against real Azure Retail Prices meters. The CLI and web dashboard share three demos:
+
+- **Instant Demo** — prices a single live model-by-name call and compares instant vs. deployed rates.
+- **Prompt Cache Demo** — warms a long stable prefix, then shows the cold→warm token savings on a repeated call.
+- **Compaction Demo** — condenses long working notes into a short durable summary and shows the before→after token drop.
+
+Authentication uses Microsoft Entra (`DefaultAzureCredential`); deployment uses Azure Container Apps via `azd`. No API keys or secrets are stored in this repo.
 
 ## Contents
 
-- [Introduction](#introduction)
-- [Example overview](#example-overview)
+- [Quick Start](#quick-start)
+- [Example Overview](#example-overview)
 - [What It Does](#what-it-does)
 - [Screenshots](#screenshots)
 - [Prerequisites](#prerequisites)
@@ -18,25 +26,23 @@ This Java 21 / Spring Boot sample for Microsoft Foundry instant models demonstra
 - [Prompt Cache Demo](#prompt-cache-demo)
 - [Compaction Demo](#compaction-demo)
 - [Example Output](#example-output)
+- [Token Efficiency Principles](#token-efficiency-principles)
 - [Cost Calculation](#cost-calculation)
     - [`gpt-chat-latest` vs `gpt-5.5` Pricing](#gpt-chat-latest-vs-gpt-55-pricing)
     - [Instant versus deployed pricing](#instant-versus-deployed-pricing)
 - [Project Layout](#project-layout)
 
-## Introduction
+## Quick Start
 
-Token efficiency is about getting the answer you need with the smallest useful prompt, model, and tool surface. This sample makes that visible by printing input, output, cached-input, and cost for every call.
+```powershell
+az login
+Copy-Item .env.example .env   # then set FOUNDRY_PROJECT_ENDPOINT
+mvn spring-boot:run
+```
 
-- Switch off unused MCP servers and external tool connections. Tool definitions, schemas, and connection context can add tokens before the model even starts answering. In this repo, the instant demo uses the Responses API directly and does not attach tools, so the request stays small.
-- Use the smallest model that can complete the task. The app defaults to `gpt-chat-latest` because it was available for this instant-model project, but you should compare cheaper or smaller instant models when the task is summarization, classification, routing, or short Q&A.
-- Split agent work into small, scoped sessions. The instant demo asks one focused question and shows a small input footprint, for example `19` input tokens in the sample output. Avoid carrying a long conversation history into tasks that do not need it.
-- Compact or restart long assistant conversations after durable context has been captured. Conversation compaction replaces a long raw transcript with a concise working summary, so the next model call spends fewer input tokens re-reading old exploration, logs, and resolved decisions. The dashboard's Compaction Demo makes this visible: it sends long working notes to the selected instant model with a compaction instruction, then compares the service-reported source input tokens with the compacted-summary output tokens and shows tokens saved, reduction percentage, and the cost of the compaction call itself. Treat the savings as future-prompt savings, not a free operation, because the compaction call still consumes tokens. Before compacting, save important facts in code, tests, README notes, issues, or a short checklist because a compacted summary might not preserve exact wording, command output, or every discarded branch of reasoning.
-- Keep prompts and instructions precise, short, and task-specific. The instant demo prompt is a single sentence, which keeps standard input cost low. The cache demo intentionally uses a large stable prefix only to show when prompt caching helps.
-- Prefer completions before chat, agents, or cloud agent workflows when the job is a simple one-shot response. This sample calls the Responses API directly; an agent is only worth the extra orchestration and context when you need planning, tool use, state, or multi-step behavior.
-- Reuse stable long context with prompt caching. In the cache demo, the warm-up call pays for the full long prompt, while the repeated call shows most of the prefix as cached input. A verified run showed `9728` cached input tokens and about `96%` cache hit rate, reducing the estimated call cost from roughly `USD 0.051` to roughly `USD 0.007`.
-- Watch both input and output. Short prompts can still get expensive if they produce long answers. The dashboard shows output tokens and output cost separately so you can tighten response length when needed.
+Open `http://localhost:8080` and run the three demos. For the full Azure provision-and-deploy path, jump to [Provision Azure Resources](#provision-azure-resources).
 
-## Example overview
+## Example Overview
 
 Instant models in Microsoft Foundry let you call supported models by name without first creating a deployment. They are useful for prototyping, comparing models, trying new releases quickly, and building early application flows before you decide whether you need a dedicated deployment for reserved throughput, custom controls, or production isolation.
 
@@ -44,11 +50,7 @@ Instant models are still quota-governed. During preview, they draw from a per-mo
 
 Sanitized validation finding: one West US 3 subscription checked during development reported a Tier 5 `gpt-chat-latest` Global Standard quota of `50,000` requests per minute and `5,000,000` tokens per minute, with no Global Standard deployment quota reserved at the time of the check. Treat this as a point-in-time example only; your subscription, quota tier, model, region, and reserved deployments can change the effective limit. Runtime response headers such as `x-ratelimit-limit-tokens`, `x-ratelimit-remaining-tokens`, and `retry-after-ms` are the best signal for live throttling behavior.
 
-This Java sample calls an instant model from a Foundry project endpoint, prints token usage, and estimates cost per call with live pricing from the Azure Retail Prices API.
-
-The dashboard includes three examples: an instant model call priced live against Azure Retail Prices meters with an instant-versus-deployed price comparison, a prompt cache demo that warms the model cache in real time, and a compaction demo that turns long working notes into a shorter reusable summary.
-
-The sample follows the Microsoft Foundry Java quickstart pattern with `com.azure:azure-ai-agents:2.0.0` and uses Microsoft Entra authentication through `DefaultAzureCredential`. No API key or project-specific secret is stored in this repository.
+This Java sample calls an instant model from a Foundry project endpoint, prints token usage, and estimates cost per call with live pricing from the Azure Retail Prices API. It follows the Microsoft Foundry Java quickstart pattern with `com.azure:azure-ai-agents:2.0.0`.
 
 ## What It Does
 
@@ -246,6 +248,19 @@ Pricing meters: input='5.5 ShortCo inp Gl 1M Tokens', cached-input='5.5 ShortCo 
 Cost breakdown: standard-input=USD 0.00009500, cached-input=USD 0.00000000, output=USD 0.00318000
 Estimated cost: USD 0.00327500
 ```
+
+## Token Efficiency Principles
+
+Token efficiency means getting the answer you need with the smallest useful prompt, model, and tool surface. This sample makes that visible by printing input, output, cached-input, and cost for every call.
+
+- **Drop unused tools.** MCP servers and tool connections add definitions and schemas that cost tokens before the model even answers. The instant demo attaches no tools, so the request stays small.
+- **Use the smallest model that fits.** The app defaults to `gpt-chat-latest`, but compare cheaper instant models for summarization, classification, routing, or short Q&A.
+- **Scope sessions tightly.** The instant demo asks one focused question (`19` input tokens in the sample output) instead of carrying long history into tasks that don't need it.
+- **Compact long conversations** once durable context is captured. Replacing a raw transcript with a concise summary cuts input tokens on later turns; the Compaction Demo reports tokens saved, reduction percentage, and the call's own cost. Save key facts in code, tests, or issues first, since a summary may drop exact wording.
+- **Keep prompts precise and short.** The instant demo prompt is a single sentence; the cache demo uses a large prefix only to show when caching helps.
+- **Prefer a direct completion** over chat or agent workflows for one-shot jobs. Agents only pay off when you need planning, tools, state, or multi-step behavior.
+- **Reuse stable context with prompt caching.** In the cache demo the warm-up pays for the full prompt and the repeat reuses the prefix. A verified run hit `9728` cached tokens (~`96%`), cutting cost from ~`USD 0.051` to ~`USD 0.007`.
+- **Watch output, not just input.** Short prompts can still get expensive with long answers, so the dashboard shows output tokens and cost separately.
 
 ## Cost Calculation
 
