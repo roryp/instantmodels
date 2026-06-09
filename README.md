@@ -41,6 +41,8 @@ Copy-Item .env.example .env   # then set FOUNDRY_PROJECT_ENDPOINT
 mvn spring-boot:run
 ```
 
+> Inside a dev container or GitHub Codespace, the browser sign-in flow is unavailable. Use `az login --use-device-code` instead.
+
 Open `http://localhost:8080` and run the three demos. For the full Azure provision-and-deploy path, jump to [Provision Azure Resources](#provision-azure-resources).
 
 ## Example Overview
@@ -99,6 +101,8 @@ Sign in before running the sample:
 az login
 ```
 
+> In a dev container or GitHub Codespace, run `az login --use-device-code` because the local browser redirect is not available.
+
 ## Configure
 
 Create a local `.env` file from the checked-in template:
@@ -136,6 +140,8 @@ azd auth login
 azd env new instantmodels --location westus3
 azd up
 ```
+
+> In a dev container or GitHub Codespace, use the device-code flow for both sign-ins: `az login --use-device-code`
 
 `azd up` provisions the Azure resources, builds the Spring Boot Docker image locally, pushes it to Azure Container Registry, deploys it to Azure Container Apps, and prints the live endpoint. Local Docker must be running because this template intentionally disables ACR remote build.
 

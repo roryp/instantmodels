@@ -14,3 +14,4 @@ infra/main.json
 *.iml
 article-assets/capture-article-screenshots.js
 article-assets/capture-article-screenshots.js
+.devcontainer/devcontainer-lock.json

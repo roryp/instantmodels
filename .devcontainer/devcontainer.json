@@ -1,7 +1,11 @@
 {
 	"name": "instantmodels (Java 21 + azd)",
-	// Java 21 + Maven image maintained by the Dev Container spec team.
-	"image": "mcr.microsoft.com/devcontainers/java:1-21-bookworm",
+	// Java 21 + Maven image maintained by the Dev Container spec team, wrapped in
+	// a small Dockerfile that strips a broken yarn apt source from the base image
+	// (its GPG key rotated and breaks `apt-get update` for every Feature).
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
 
 	"features": {
 		// Guarantee Maven is present on PATH for the documented `mvn` dev loop
@@ -27,8 +31,14 @@
 		}
 	},
 
-	// Pre-fetch Maven dependencies so the first build/test is fast.
-	"postCreateCommand": "mvn -B -ntp -DskipTests dependency:go-offline",
+	// Normalize ownership of regenerable build output, then pre-fetch Maven
+	// dependencies so the first build/test is fast. The workspace is a 9p bind
+	// mount from the host where every file maps to root:root. Build artifacts
+	// left behind by an earlier root-context run (e.g. a build done before
+	// remoteUser was applied) stay root-owned, and Maven's resources plugin then
+	// fails with "Operation not permitted" because a non-owner cannot set the
+	// destination file's mtime. Resetting target/ to vscode keeps `mvn` working.
+	"postCreateCommand": "sudo chown -R vscode:vscode target 2>/dev/null || true; mvn -B -ntp -DskipTests dependency:go-offline",
 
 	"customizations": {
 		"vscode": {
