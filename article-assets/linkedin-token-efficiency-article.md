@@ -1,145 +1,162 @@
 # Token Efficiency Is a Product Feature
 
-## A Java demo with Microsoft Foundry instant models
+## A technical tour of a Java + Microsoft Foundry instant-models demo
 
-Live demo: [http://aka.ms/costs](http://aka.ms/costs)
-
-Repo: [https://github.com/roryp/instantmodels](https://github.com/roryp/instantmodels)
+Live demo: [http://aka.ms/costs](http://aka.ms/costs) · Repo: [https://github.com/roryp/instantmodels](https://github.com/roryp/instantmodels)
 
 ![Token Efficiency dashboard](instant-models-dashboard.png){ width=6.5in }
 
-*The dashboard starts with three focused workflows: a small instant model call, a prompt cache comparison, and a compaction demo.*
+*Three live workflows on one screen — a zero-deployment instant model call, a prompt-cache warm/repeat comparison, and a compaction pass. Every number is priced against live Azure Retail Prices meters, not a hardcoded table. (Figures shown are representative; live values vary by prompt, region, quota, and pricing response.)*
 
-## Why I Built This
+## Why this exists
 
-Token efficiency is becoming an important part of how we design, build, and operate AI applications. As more teams move from experimentation into production, the question is no longer only whether a model can produce a useful answer. The question is also how much context was required, how much output was generated, whether any of the input was cached, and what the estimated cost of that interaction was.
+Most "AI cost" conversations happen after the bill arrives. This flips that: a Spring Boot dashboard backed by Microsoft Foundry **instant models** where, for every call, you see input tokens, output tokens, cached input tokens, the exact retail meter each one hits, and the cost — while you are still designing the feature.
 
-I built a small Java demo to make those tradeoffs visible. The demo uses Microsoft Foundry instant models and shows three common patterns that affect token usage: direct model calls, prompt caching, and conversation compaction. It also connects token usage to pricing so that cost is not treated as an abstract concern or a surprise that only shows up later.
+What makes it worth a look:
 
-For me, that is the useful part. Token efficiency should be visible while an application is being designed, not only after it is already running in production.
+- **Zero-deployment inference.** `gpt-chat-latest` is called *by name* through the Responses API — nothing to provision — and bills up to **2.5× cheaper** than the equivalent deployed tiers.
+- **Pricing resolved live.** No prices in source. Each run queries the Azure Retail Prices API and *discovers* the standard-input, cached-input, and output meters by name.
+- **Cache hit read from the model**, not estimated — straight from `usage.inputTokensDetails().cachedTokens()`.
+- **Compaction with a measured token delta**, so "spend tokens now to save later" stops being a hand-wave.
+- **Passwordless throughout** — `DefaultAzureCredential` locally, managed identity in Azure. No keys in the sample.
 
-## Instant Models
+## Architecture
 
-The first part of the demo is a direct instant model call. This is the simplest pattern: a focused prompt is sent to the model, the response comes back, and the application displays the token usage and estimated cost.
+Java 21, Spring Boot, the Azure AI Agents SDK for the Responses API, and a small `java.net.http` client for pricing. Three POST endpoints; one service fanning out to Foundry and the pricing API.
 
-This matters because not every task needs agent orchestration, tool calling, long-running context, or a large instruction surface. For simple work, a direct model call can be easier to understand, easier to measure, and often more efficient.
+```text
+Browser (static dashboard)
+   │  POST /api/instant · /api/cache-demo · /api/compact-demo
+   ▼
+@RestController ──▶ DemoRunService
+   │ Azure AI Agents SDK        │ java.net.http + OData
+   ▼                            ▼
+Foundry Responses API     Azure Retail Prices API
+gpt-chat-latest (by name) prices.azure.com (live meters)
+```
 
-The code path is intentionally small:
+## 1. Instant models: inference with no deployment
+
+The baseline call — prompt in, response out — with Entra auth and no secrets:
 
 ```java
-Response response = responsesClient().getResponseService().create(new ResponseCreateParams.Builder()
+Response response = responsesClient().getResponseService().create(
+    new ResponseCreateParams.Builder()
         .input(prompt)
         .model(InstantModelsConfig.model())
         .build());
 ```
 
-The client uses Microsoft Entra authentication through `DefaultAzureCredential`, which keeps API keys out of the sample and makes the demo closer to the pattern I would want in a real app.
+The novelty is what *isn't* there: no deployment, no reserved throughput, no endpoint config. `gpt-chat-latest` is available to every Foundry project and billed per token — and the demo proves the cost claim by pricing the same tokens against the deployed alternatives it discovers from live meters.
 
-![Dashboard populated with representative result metrics](instant-models-results.png){ width=6.5in }
+![Instant demo priced live against Azure Retail Prices meters](instant-models-results.png){ width=6.5in }
 
-*Representative metric view using sample values from the README and article capture data. Live values vary by model, region, prompt, quota, and pricing response.*
+*Representative run: 19 input + 31 output tokens cost USD 0.001025 (≈ USD 1.03 / 1,000 calls). The "instant vs deployed" panel ranks the same tokens against Data Zone (1.1×) and Priority Processing (2.5×) — all from live rates.*
 
-## What About Agents?
+## 2. The live pricing engine
 
-This does not mean agents are the wrong pattern. Agents are valuable when the application needs planning, tools, iteration, and multi-step execution.
+Nothing is hardcoded. Each run builds an OData filter and pages the public Retail Prices API:
 
-The point is that those capabilities have a cost. Tool schemas, instructions, previous messages, attached context, and external connections can all increase the amount of information sent to the model. Token efficiency starts by matching the architecture to the task instead of defaulting every interaction to the heaviest possible workflow.
+```java
+String filter = "serviceName eq 'Foundry Models' and priceType eq 'Consumption'"
+        + " and armRegionName eq '" + escapeOData(region) + "'"
+        + " and contains(meterName, '" + escapeOData(meterPrefix) + "')";
+```
 
-In practice, that means using agents when their extra capabilities are actually part of the product experience, and using simpler model calls when the job is small and well scoped.
+A model maps to a *family* of terse, overlapping meter names — `5.5 ShortCo inp Gl 1M Tokens`, `... cd inp ...`, `... opt ...`. The client resolves each role with strict heuristics, then computes money in `BigDecimal` (per-token division carried to 12 places, total rounded to 8) so sub-cent costs stay honest at scale:
 
-## Prompt Caching
+```java
+private boolean isStandardInputMeter(String n) {
+    return containsWord(n, "inp") && !containsSequence(n, "cd inp") && !containsWord(n, "opt");
+}
+private boolean isCachedInputMeter(String n) { return containsSequence(n, "cd inp"); }
+private boolean isOutputMeter(String n)      { return containsWord(n, "opt"); }
+```
 
-The second part of the demo shows prompt caching. Many AI applications repeatedly send the same large body of context to the model. This might be a policy document, a product catalogue, a coding standard, a rubric, or a long set of instructions.
+The payoff: the dashboard reports not just *what* a call cost, but *which* live meter it hit, in which region, retrieved when — and builds the comparison from the same data.
 
-When that stable context is reused across calls, prompt caching can reduce the cost of repeated input by allowing the reusable prefix to be billed differently from fresh input.
+## 3. Prompt caching, from real telemetry
 
-The important design point is that caching works best when the reusable context is deliberate and stable. If the prompt changes constantly, the cache benefit is reduced. This pushes teams to think more carefully about prompt structure. Stable context should be separated from request-specific context. Instructions should be consistent where possible. Large reference material should not be casually mixed with volatile user input if the goal is to benefit from caching.
+The demo sends a long, stable prompt — 120 identical sections, ~61k characters — **twice** under a stable `promptCacheKey`. The hit is read from the usage payload, not inferred, and split for pricing:
 
-In the demo, the cache workflow sends the same long reference prompt twice with a stable `promptCacheKey`. The first call pays for the full prefix. The repeated call can reuse the cached prefix, shifting most of the repeated input into the cached-input meter.
+```java
+ResponseCreateParams request = new ResponseCreateParams.Builder()
+        .input(prompt)
+        .model(InstantModelsConfig.model())
+        .maxOutputTokens(80)
+        .promptCacheKey(cacheKey)
+        .build();
 
-![Prompt cache result panel](prompt-cache-results.png){ width=6.2in }
+long cachedInputTokens = Math.min(cachedInputTokens(usage), usage.inputTokens());
+long standardInputTokens = usage.inputTokens() - cachedInputTokens;
+```
 
-*The repeated call keeps the same total input size, but most of the reusable prefix is reported as cached input.*
+![Prompt cache demo showing a 96.86% cache hit on reuse](prompt-cache-results.png){ width=6.2in }
 
-## Compaction
+*Cold call: 0 cached tokens, USD 0.0513. Warm call: 9,728 of 10,043 input tokens served from cache (96.86% hit), USD 0.007519 — USD 43.78 saved per 1,000 reuses, with the prefix billed at USD 0.50 / 1M cached vs USD 5.00 / 1M standard.*
 
-The third part of the demo shows conversation compaction. Long-running assistant sessions can become expensive when every new request carries the full history of exploration, debugging, false starts, decisions, logs, and intermediate discussion.
+The lesson is structural: caching rewards prompts where stable context is physically separated from volatile input, so the cached-input meter does the heavy lifting.
 
-Some of that history is useful. Some of it is no longer necessary. Compaction creates a shorter summary that can be used as future context instead of repeatedly sending the entire conversation.
+## 4. Compaction — and why this demo keeps it human-readable
 
-Compaction is not free, because the compaction step itself uses tokens. The benefit comes when the shorter summary is reused in later calls. That makes compaction an engineering tradeoff rather than a generic best practice. It is most useful when a session is long enough that the future savings outweigh the cost of summarising the current context.
+Long sessions get expensive when every turn drags the full history of exploration, dead ends, and logs. Compaction trades one summarization call now for cheaper context on every later turn. It uses an explicit instruction and shows the before/after token delta:
 
-![Compaction result panel](compaction-results.png){ width=6.2in }
+```java
+Response response = responsesClient().getResponseService().create(
+    new ResponseCreateParams.Builder()
+        .input(prompt)                       // long working notes
+        .instructions(COMPACTION_INSTRUCTIONS)
+        .model(InstantModelsConfig.model())
+        .maxOutputTokens(360)
+        .build());
 
-*Compaction is not free. The win comes when the shorter summary replaces repeated raw context in later turns.*
+long reclaimed = tokensSaved(usage.inputTokens(), usage.outputTokens());
+```
 
-## Pricing
+![Compaction demo: 419 source tokens reduced to 265, a 37% drop](compaction-results.png){ width=6.2in }
 
-The demo also uses pricing information so that token counts can be connected to estimated cost. This is important because token usage alone is only part of the story. Input tokens, cached input tokens, and output tokens can have different rates.
+*Representative pass: 419 tokens of notes → a 265-token summary (37% fewer, 1.6× smaller), reclaiming 154 tokens per future reuse. The compaction call costs USD 0.01004500; the win lands on every later turn that ships the summary instead of the raw notes.*
 
-A useful application should make those categories visible so developers can understand what is driving cost. The calculation is intentionally straightforward: standard input tokens, cached input tokens, and output tokens are counted separately and then matched against the relevant pricing meters from the Azure Retail Prices API.
+**Why the instruction-prompt version, not the native one?** The Responses API now ships *native* context management — `truncation: "auto"` to drop the oldest items past the context window, a `context_management` option with a `compact_threshold` for server-side compaction mid-stream, and a standalone `/responses/compact` endpoint. But those return an **opaque, encrypted compaction item** built for the model to consume on the next turn, not for a human to read. You cannot put it on a dashboard, diff it, or show the token delta line by line. For a *teaching* tool whose whole job is to make the tradeoff visible, an instruction prompt that produces legible before/after text and an auditable savings number is the right call. In **production**, the native primitives are usually better — cheaper to wire up and tuned for the model, not for display.
+
+## The cost model
+
+The three token classes bill at different rates, so the estimate keeps them separate and matches each to its discovered meter:
 
 ```text
 cost = standard_input_tokens * standard_input_rate
-     + cached_input_tokens * cached_input_rate
-     + output_tokens * output_rate
+     + cached_input_tokens   * cached_input_rate
+     + output_tokens         * output_rate
 ```
 
-This gives developers and product teams a clearer view of where cost is coming from and what can be changed. A team might reduce repeated input through caching, reduce unnecessary output with better response constraints, or avoid loading tools that are not needed for a particular workflow.
+Because rates are live and math is `BigDecimal`, the dashboard attributes cost to a cause — repeated input you could cache, verbose output you could constrain — instead of one opaque number.
 
-This is also where token efficiency becomes a product design concern. It is not only an infrastructure or finance issue. A product that sends too much context, keeps unnecessary tools enabled, or allows sessions to grow indefinitely will behave differently from one that is designed with scoped prompts, stable reusable context, and clear workflow boundaries.
+## Auth and deploy
 
-## Practical Lessons
-
-There are a few practical lessons from the demo:
-
-- Use direct model calls when the task is simple.
-- Use the smallest model that can reliably complete the work.
-- Keep prompts specific and avoid attaching unnecessary context.
-- Disable unused MCP servers and external tools when they are not needed.
-- Separate stable context from request-specific context so caching can be effective.
-- Compact long sessions when the future savings justify it.
-- Measure output tokens as carefully as input tokens, because long responses also affect cost.
-- Price against live meters instead of stale assumptions.
-
-None of these are dramatic by themselves. They are small design choices that add up, especially when an AI feature moves from a prototype to something used repeatedly by real people.
-
-## Try The Demo
-
-From a clean checkout:
-
-```powershell
-mvn test
-mvn compile exec:java
-```
-
-To run the web dashboard locally:
-
-```powershell
-mvn spring-boot:run
-```
-
-Then open:
-
-```text
-http://localhost:8080
-```
-
-For Azure deployment, the repo uses `azd` with Azure Container Apps, a user-assigned managed identity, Azure Container Registry, and Microsoft Foundry access through RBAC.
+`az login` feeds `DefaultAzureCredential` locally; in Azure the Container App runs under a managed identity holding exactly two roles — **AcrPull** and **Azure AI User**. No keys shipped. Infra (Foundry, ACR, Container Apps, Log Analytics, identity, RBAC) is `azd` + Bicep:
 
 ```powershell
 az login
-azd auth login
-azd env new instantmodels --location westus3
 azd up
 ```
 
-## My Takeaway
+## Practical lessons
 
-The most useful part of this demo is that it makes token efficiency visible during development. Developers should not have to wait for a billing surprise before they start asking how much context their application is sending.
+- Direct call for small tasks; skip agent orchestration you will not use.
+- Smallest model that reliably completes the work.
+- Physically separate stable context from request-specific input so caching engages.
+- Keep `promptCacheKey` stable — churn it and the benefit evaporates.
+- Treat compaction as break-even math: reclaimed tokens per future turn vs the one-time cost.
+- Budget output tokens like input tokens; at USD 30 / 1M, output dominated the instant call's cost.
+- Price against live meters with region, scope, and timestamp visible.
 
-Token efficiency is not about making prompts as small as possible. It is about using the right amount of context, the right model, and the right workflow for the job. That makes applications easier to reason about, easier to operate, and more predictable in production.
+## Try it
 
-Live demo: [http://aka.ms/costs](http://aka.ms/costs)
+```powershell
+mvn test
+mvn spring-boot:run   # then open http://localhost:8080
+```
 
-Repo: [https://github.com/roryp/instantmodels](https://github.com/roryp/instantmodels)
+Token efficiency is not about shrinking prompts to nothing — it is about spending the right context, on the right model, in the right workflow, and being able to *see* that choice in real numbers. That is what turns cost from an afterthought into a product feature.
+
+Live demo: [http://aka.ms/costs](http://aka.ms/costs) · Repo: [https://github.com/roryp/instantmodels](https://github.com/roryp/instantmodels)
