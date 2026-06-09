@@ -27,6 +27,7 @@ Authentication uses Microsoft Entra (`DefaultAzureCredential`); deployment uses 
 - [Compaction Demo](#compaction-demo)
 - [Example Output](#example-output)
 - [Token Efficiency Principles](#token-efficiency-principles)
+- [Token Efficiency Analyzer Agent](#token-efficiency-analyzer-agent)
 - [Cost Calculation](#cost-calculation)
     - [`gpt-chat-latest` vs `gpt-5.5` Pricing](#gpt-chat-latest-vs-gpt-55-pricing)
     - [Instant versus deployed pricing](#instant-versus-deployed-pricing)
@@ -263,6 +264,14 @@ Token efficiency means getting the answer you need with the smallest useful prom
 - **Reuse stable context with prompt caching.** In the cache demo the warm-up pays for the full prompt and the repeat reuses the prefix. A verified run hit `9728` cached tokens (~`96%`), cutting cost from ~`USD 0.051` to ~`USD 0.007`.
 - **Watch output, not just input.** Short prompts can still get expensive with long answers, so the dashboard shows output tokens and cost separately.
 
+## Token Efficiency Analyzer Agent
+
+The repo ships a VS Code custom agent profile at `.github/agents/instantmodels.agent.md` that turns these principles into on-demand advice. Paste a prompt or ask a token-efficiency question and the **Token Efficiency Analyzer** returns concise, prioritized guidelines—smaller model, tighter prompt, dropped tools, caching, or compaction—for the case at hand.
+
+- It advises only: read-only, with no demos, measurements, charts, or code edits.
+- It leads with the single highest-impact change, then flags output-length risk (a short prompt can still produce a long, costly answer).
+- For exact token and cost numbers, it points you back to the live instant flow (`mvn compile exec:java`).
+
 ## Cost Calculation
 
 The Responses API returns usage metadata. The sample uses those token counts and live retail pricing meters to estimate cost.
@@ -314,6 +323,7 @@ An instant model and a Global Standard deployment of the same model bill at the 
 ```text
 .
 |-- .env.example
+|-- .github/agents/                 # VS Code custom agents (Token Efficiency Analyzer profile)
 |-- AGENTS.md                       # Guidance for coding agents
 |-- Dockerfile                      # Spring Boot container build (local build, no ACR remote build)
 |-- azure.yaml                      # azd service definition (web -> Container App)
