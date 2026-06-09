@@ -1,0 +1,52 @@
+{
+	"name": "instantmodels (Java 21 + azd)",
+	// Java 21 + Maven image maintained by the Dev Container spec team.
+	"image": "mcr.microsoft.com/devcontainers/java:1-21-bookworm",
+
+	"features": {
+		// Guarantee Maven is present on PATH for the documented `mvn` dev loop
+		// without reinstalling the JDK that ships in the base image.
+		"ghcr.io/devcontainers/features/java:1": {
+			"version": "none",
+			"installMaven": "true"
+		},
+		// Build and run containers locally; required for the `azd up` local Docker build.
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
+		// `az` CLI. Also auto-installs the Bicep CLI on first `az bicep ...` use.
+		"ghcr.io/devcontainers/features/azure-cli:1": {},
+		// `azd` for provision / build / push / deploy.
+		"ghcr.io/azure/azure-dev/azd:0": {}
+	},
+
+	// Spring Boot web dashboard (server.port defaults to 8080).
+	"forwardPorts": [8080],
+	"portsAttributes": {
+		"8080": {
+			"label": "Instant Models Web",
+			"onAutoForward": "notify"
+		}
+	},
+
+	// Pre-fetch Maven dependencies so the first build/test is fast.
+	"postCreateCommand": "mvn -B -ntp -DskipTests dependency:go-offline",
+
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"vscjava.vscode-java-pack",
+				"vmware.vscode-boot-dev-pack",
+				"ms-azuretools.vscode-azd",
+				"ms-azuretools.vscode-bicep",
+				"ms-azuretools.vscode-docker",
+				"ms-azuretools.vscode-azurecontainerapps",
+				"redhat.vscode-yaml"
+			],
+			"settings": {
+				"java.configuration.updateBuildConfiguration": "automatic",
+				"files.eol": "\n"
+			}
+		}
+	},
+
+	"remoteUser": "vscode"
+}
