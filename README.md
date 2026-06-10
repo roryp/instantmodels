@@ -2,6 +2,8 @@
 
 > A Java 21 / Spring Boot sample for Microsoft Foundry **instant models** that makes token cost visible on every call.
 
+**Slides:** [doc/Slides.pdf](doc/Slides.pdf)
+
 **Live app:** [http://aka.ms/costs](http://aka.ms/costs)
 
 Call supported models by name—no deployment required—and see input, output, and cached tokens priced live against real Azure Retail Prices meters. The CLI and web dashboard share three demos:
